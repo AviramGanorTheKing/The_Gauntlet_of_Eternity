@@ -782,8 +782,13 @@ export class GameScene extends Phaser.Scene {
 
         // When player enters the trigger zone, start boss intro
         this.physics.add.overlap(this.player, this._bossTriggerZone, () => {
+            console.log('[GameScene] Boss trigger zone overlap!', {
+                alreadyTriggered: this._bossIntroTriggered,
+                hasBoss: !!this.activeBoss
+            });
             if (this._bossIntroTriggered || this.activeBoss) return;
             this._bossIntroTriggered = true;
+            console.log('[GameScene] Triggering boss intro...');
             this._triggerBossIntro();
         });
     }
@@ -831,8 +836,11 @@ export class GameScene extends Phaser.Scene {
      * Actually spawn the boss after intro completes.
      */
     _spawnBoss(bossInfo, bx, by) {
+        console.log('[GameScene] _spawnBoss called', { key: bossInfo.key, bx, by });
         const BossClass = BOSS_CLASSES[bossInfo.key] || Boss;
+        console.log('[GameScene] Boss class:', BossClass?.name || 'Unknown');
         const boss = new BossClass(this, bx, by, bossInfo);
+        console.log('[GameScene] Boss created:', boss);
         boss.setTarget(this.player);
         this.enemies.add(boss);
         this.activeBoss = boss;

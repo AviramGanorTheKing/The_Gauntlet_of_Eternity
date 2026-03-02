@@ -803,10 +803,25 @@ export class GameScene extends Phaser.Scene {
         // Pause player input briefly
         this.player.body.setVelocity(0, 0);
 
+        // Track if boss was spawned by intro callback
+        let bossSpawned = false;
+
         // Launch boss intro scene as overlay
         this.scene.launch('BossIntroScene', {
             bossData: bossInfo,
             onComplete: () => {
+                if (!bossSpawned) {
+                    bossSpawned = true;
+                    this._spawnBoss(bossInfo, bx, by);
+                }
+            }
+        });
+
+        // Safety fallback: spawn boss after 4 seconds if intro callback doesn't fire
+        this.time.delayedCall(4000, () => {
+            if (!bossSpawned && !this.activeBoss) {
+                console.warn('[GameScene] Boss intro callback did not fire, spawning boss directly');
+                bossSpawned = true;
                 this._spawnBoss(bossInfo, bx, by);
             }
         });

@@ -749,7 +749,7 @@ export class GameScene extends Phaser.Scene {
         let bossRoom = rooms[0];
         let maxArea = 0;
         for (const room of rooms) {
-            const area = room.width * room.height;
+            const area = room.w * room.h;
             if (area > maxArea) {
                 maxArea = area;
                 bossRoom = room;
@@ -757,15 +757,15 @@ export class GameScene extends Phaser.Scene {
         }
 
         const ts = GameConfig.TILE_SIZE;
-        const bx = (bossRoom.x + bossRoom.width / 2) * ts;
-        const by = (bossRoom.y + bossRoom.height / 2) * ts;
+        const bx = (bossRoom.x + bossRoom.w / 2) * ts;
+        const by = (bossRoom.y + bossRoom.h / 2) * ts;
 
         // Store boss spawn info
         this._pendingBoss = { bossInfo, bx, by };
 
         // Create trigger zone at boss room entrance
-        const triggerWidth = bossRoom.width * ts * 0.6;
-        const triggerHeight = bossRoom.height * ts * 0.6;
+        const triggerWidth = bossRoom.w * ts * 0.6;
+        const triggerHeight = bossRoom.h * ts * 0.6;
         this._bossTriggerZone = this.add.zone(bx, by, triggerWidth, triggerHeight);
         this.physics.add.existing(this._bossTriggerZone, true);
 

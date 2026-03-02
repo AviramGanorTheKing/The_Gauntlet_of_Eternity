@@ -9,7 +9,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Known Issues
-- **Boss not spawning on floor 5** - First boss (Bone Sovereign) does not appear
+| Bug | Description | Discovered | Fixed |
+|-----|-------------|------------|-------|
+| Boss not spawning on floor 5 | First boss (Bone Sovereign) does not appear | 2026-03-02 | - |
 
 ---
 

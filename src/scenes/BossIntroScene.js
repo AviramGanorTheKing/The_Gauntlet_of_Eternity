@@ -112,111 +112,108 @@ export class BossIntroScene extends Phaser.Scene {
 
     _playIntroSequence() {
         const { width } = this.cameras.main;
-        const timeline = this.tweens.createTimeline();
 
-        // Phase 1: Fade in overlay and letterbox bars
-        timeline.add({
-            targets: this.overlay,
-            alpha: 0.7,
-            duration: 300,
-            ease: 'Power2'
-        });
-
-        timeline.add({
-            targets: [this.topBar, this.bottomBar],
-            alpha: 1,
-            duration: 200,
-            ease: 'Power2'
-        });
-
-        // Phase 2: Boss silhouette appears with scale effect
-        timeline.add({
-            targets: this.silhouette,
-            alpha: 1,
-            duration: 400,
-            ease: 'Back.easeOut',
-            onStart: () => {
-                this.silhouette.setScale(0.5);
-            }
-        });
-
-        timeline.add({
-            targets: this.silhouette,
-            scaleX: 1,
-            scaleY: 1,
-            duration: 300,
-            ease: 'Back.easeOut'
-        });
-
-        // Phase 3: Name slams in
-        timeline.add({
-            targets: this.bossName,
-            alpha: 1,
-            duration: 100,
-            onStart: () => {
-                this.cameras.main.shake(100, 0.01);
-            }
-        });
-
-        // Phase 4: Lines extend from name
-        timeline.add({
-            targets: this.leftLine,
-            width: width / 2 - 180,
-            duration: 200,
-            ease: 'Power2'
-        });
-
-        timeline.add({
-            targets: this.rightLine,
-            width: width / 2 - 180,
-            duration: 200,
-            ease: 'Power2',
-            offset: '-=200'
-        });
-
-        // Phase 5: Title fades in
-        timeline.add({
-            targets: this.bossTitle,
-            alpha: 1,
-            duration: 300,
-            ease: 'Power2'
-        });
-
-        // Phase 6: Warning text pulses
-        timeline.add({
-            targets: this.warningText,
-            alpha: 1,
-            duration: 200,
-            onComplete: () => {
-                this.tweens.add({
-                    targets: this.warningText,
-                    alpha: 0.5,
+        // Use tweens.chain() - the modern API replacing deprecated createTimeline()
+        this.tweens.chain({
+            tweens: [
+                // Phase 1: Fade in overlay
+                {
+                    targets: this.overlay,
+                    alpha: 0.7,
+                    duration: 300,
+                    ease: 'Power2'
+                },
+                // Phase 1b: Letterbox bars
+                {
+                    targets: [this.topBar, this.bottomBar],
+                    alpha: 1,
+                    duration: 200,
+                    ease: 'Power2'
+                },
+                // Phase 2: Boss silhouette appears
+                {
+                    targets: this.silhouette,
+                    alpha: 1,
                     duration: 400,
-                    yoyo: true,
-                    repeat: 2
-                });
-            }
+                    ease: 'Back.easeOut',
+                    onStart: () => {
+                        this.silhouette.setScale(0.5);
+                    }
+                },
+                // Phase 2b: Silhouette scales up
+                {
+                    targets: this.silhouette,
+                    scaleX: 1,
+                    scaleY: 1,
+                    duration: 300,
+                    ease: 'Back.easeOut'
+                },
+                // Phase 3: Name slams in
+                {
+                    targets: this.bossName,
+                    alpha: 1,
+                    duration: 100,
+                    onStart: () => {
+                        this.cameras.main.shake(100, 0.01);
+                    }
+                },
+                // Phase 4: Lines extend (run together using parallel tweens)
+                {
+                    targets: this.leftLine,
+                    width: width / 2 - 180,
+                    duration: 200,
+                    ease: 'Power2',
+                    onStart: () => {
+                        // Start right line at the same time
+                        this.tweens.add({
+                            targets: this.rightLine,
+                            width: width / 2 - 180,
+                            duration: 200,
+                            ease: 'Power2'
+                        });
+                    }
+                },
+                // Phase 5: Title fades in
+                {
+                    targets: this.bossTitle,
+                    alpha: 1,
+                    duration: 300,
+                    ease: 'Power2'
+                },
+                // Phase 6: Warning text appears and pulses
+                {
+                    targets: this.warningText,
+                    alpha: 1,
+                    duration: 200,
+                    onComplete: () => {
+                        this.tweens.add({
+                            targets: this.warningText,
+                            alpha: 0.5,
+                            duration: 400,
+                            yoyo: true,
+                            repeat: 2
+                        });
+                    }
+                },
+                // Phase 7: Hold for dramatic effect
+                {
+                    targets: this.overlay,
+                    alpha: 0.7, // keep same value - just a delay
+                    duration: 800
+                },
+                // Phase 8: Everything fades out
+                {
+                    targets: [this.overlay, this.topBar, this.bottomBar, this.silhouette,
+                        this.bossName, this.bossTitle, this.warningText, this.leftLine, this.rightLine],
+                    alpha: 0,
+                    duration: 400,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        this._finishIntro();
+                    }
+                }
+            ]
         });
-
-        // Phase 7: Hold for dramatic effect
-        timeline.add({
-            targets: {},
-            duration: 800
-        });
-
-        // Phase 8: Everything fades out
-        timeline.add({
-            targets: [this.overlay, this.topBar, this.bottomBar, this.silhouette,
-                this.bossName, this.bossTitle, this.warningText, this.leftLine, this.rightLine],
-            alpha: 0,
-            duration: 400,
-            ease: 'Power2',
-            onComplete: () => {
-                this._finishIntro();
-            }
-        });
-
-        timeline.play();
     }
 
     _finishIntro() {

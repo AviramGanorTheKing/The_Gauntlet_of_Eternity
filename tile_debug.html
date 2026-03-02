@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Tile Debug — The Gauntlet of Eternity</title>
+<style>
+  body { background: #1a1a2e; color: #eee; font-family: monospace; padding: 20px; }
+  h1 { color: #e94560; }
+  h2 { color: #0f3460; background: #e94560; display: inline-block; padding: 4px 12px; margin-top: 30px; }
+  .note { color: #888; font-size: 12px; max-width: 800px; }
+
+  /* Tileset grid */
+  .tileset-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 64px);
+    gap: 2px;
+    margin: 16px 0;
+  }
+  .tileset-cell {
+    width: 64px; height: 64px;
+    position: relative;
+    cursor: pointer;
+    border: 2px solid #333;
+    background-image: url('assets/Dungeons%20and%20Pixels%20%E2%80%94%20Free%20Demo/Tilesets/Tileset_Dungeon.png');
+    background-repeat: no-repeat;
+    background-size: 768px 320px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  .tileset-cell:hover { border-color: #e94560; }
+  .tileset-cell .idx {
+    position: absolute; bottom: 1px; right: 2px;
+    font-size: 10px; color: #fff; background: rgba(0,0,0,0.8);
+    padding: 1px 3px; pointer-events: none;
+  }
+  .tileset-cell.used { border-color: #4eff4e; }
+
+  /* Room layout diagram */
+  .room-layout {
+    display: grid;
+    grid-template-columns: repeat(11, 70px);
+    grid-template-rows: repeat(9, 70px);
+    gap: 1px;
+    margin: 16px 0;
+    background: #000;
+  }
+  .room-cell {
+    width: 70px; height: 70px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    text-align: center;
+    position: relative;
+    background: #111;
+  }
+  .room-cell .tile-preview {
+    width: 48px; height: 48px;
+    background-image: url('assets/Dungeons%20and%20Pixels%20%E2%80%94%20Free%20Demo/Tilesets/Tileset_Dungeon.png');
+    background-repeat: no-repeat;
+    background-size: 576px 240px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    border: 1px solid #555;
+  }
+  .room-cell .cell-label {
+    font-size: 8px;
+    color: #e94560;
+    margin-top: 2px;
+    font-weight: bold;
+  }
+  .room-cell .tile-id {
+    font-size: 9px;
+    color: #4eff4e;
+  }
+  .room-cell.void-cell { background: #0a0a15; }
+  .room-cell.floor-cell { background: #1a2a1a; }
+  .room-cell.wall-cell { background: #2a1a1a; }
+  .room-cell.corner-cell { background: #2a2a1a; }
+  .room-cell.inner-corner-cell { background: #1a1a2a; }
+  .room-cell.corridor-cell { background: #1a2a2a; }
+  .room-cell.door-cell { background: #2a1a2a; }
+
+  /* Summary table */
+  table { border-collapse: collapse; margin: 16px 0; }
+  th { background: #16213e; color: #e94560; padding: 8px 14px; text-align: left; border: 1px solid #333; }
+  td { padding: 8px 14px; border: 1px solid #333; vertical-align: middle; }
+  tr:nth-child(even) { background: #16213e; }
+  tr:nth-child(odd) { background: #1a1a2e; }
+  .tile-inline {
+    width: 32px; height: 32px;
+    display: inline-block;
+    background-image: url('assets/Dungeons%20and%20Pixels%20%E2%80%94%20Free%20Demo/Tilesets/Tileset_Dungeon.png');
+    background-repeat: no-repeat;
+    background-size: 384px 160px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    border: 1px solid #555;
+    vertical-align: middle;
+  }
+  .tile-inline-2x {
+    width: 64px; height: 64px;
+    display: inline-block;
+    background-image: url('assets/Dungeons%20and%20Pixels%20%E2%80%94%20Free%20Demo/Tilesets/Tileset_Dungeon.png');
+    background-repeat: no-repeat;
+    background-size: 768px 320px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    border: 2px solid #e94560;
+    vertical-align: middle;
+  }
+
+  #output { background: #0a0a15; padding: 16px; margin: 16px 0; border: 1px solid #333;
+    font-size: 13px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+
+  /* ── Interactive Map Editor ── */
+  .map-grid {
+    display: grid;
+    grid-template-columns: repeat(15, 64px);
+    gap: 0px;
+    margin: 16px 0;
+    border: 2px solid #333;
+    width: fit-content;
+  }
+  .map-cell {
+    width: 64px; height: 64px;
+    position: relative;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.08);
+    background-image: url('assets/Dungeons%20and%20Pixels%20%E2%80%94%20Free%20Demo/Tilesets/Tileset_Dungeon.png');
+    background-repeat: no-repeat;
+    background-size: 768px 320px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    transition: border-color 0.15s;
+  }
+  .map-cell:hover { border-color: #e94560; z-index: 2; }
+  .map-cell-selected { border: 2px solid #e94560 !important; z-index: 3; }
+  .map-cell-changed { border-color: #4eff4e !important; }
+  .map-label {
+    position: absolute; top: 1px; left: 1px;
+    font-size: 7px; color: #e94560; background: rgba(0,0,0,0.75);
+    padding: 1px 2px; pointer-events: none; line-height: 1;
+    max-width: 60px; overflow: hidden; white-space: nowrap;
+  }
+  .map-tid {
+    position: absolute; bottom: 1px; right: 1px;
+    font-size: 9px; color: #4eff4e; background: rgba(0,0,0,0.75);
+    padding: 1px 3px; pointer-events: none;
+  }
+
+  /* Tile picker */
+  .picker-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 64px);
+    gap: 2px;
+    margin: 10px 0;
+  }
+  .picker-tile {
+    width: 64px; height: 64px;
+    position: relative;
+    cursor: pointer;
+    border: 2px solid #222;
+    background-image: url('assets/Dungeons%20and%20Pixels%20%E2%80%94%20Free%20Demo/Tilesets/Tileset_Dungeon.png');
+    background-repeat: no-repeat;
+    background-size: 768px 320px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  .picker-tile:hover { border-color: #e94560; }
+  .picker-current { border-color: #4eff4e !important; box-shadow: 0 0 8px #4eff4e; }
+  .picker-idx {
+    position: absolute; bottom: 1px; right: 2px;
+    font-size: 9px; color: #fff; background: rgba(0,0,0,0.8);
+    padding: 1px 3px; pointer-events: none;
+  }
+
+  #cell-info {
+    background: #16213e; padding: 12px; margin: 8px 0;
+    border: 1px solid #333; font-size: 13px; min-height: 60px;
+  }
+  #change-log {
+    background: #0a0a15; padding: 16px; margin: 16px 0; border: 2px solid #4eff4e;
+    font-size: 13px; white-space: pre-wrap; min-height: 40px;
+    max-height: 300px; overflow-y: auto;
+  }
+  /* Minimap */
+  .minimap {
+    display: grid;
+    gap: 0px;
+    border: 2px solid #555;
+    width: fit-content;
+  }
+  .mini-cell {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 7px; color: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.05);
+    cursor: pointer;
+    position: relative;
+  }
+  .mini-cell:hover { outline: 2px solid #e94560; z-index: 2; }
+  .mini-cell.mini-selected { outline: 2px solid #fff; z-index: 3; }
+  .mini-cell .mini-role { pointer-events: none; }
+
+  .editor-btn {
+    background: #e94560; color: #fff; border: none; padding: 8px 20px;
+    font-family: monospace; font-size: 13px; cursor: pointer; margin: 4px;
+  }
+  .editor-btn:hover { background: #ff6b81; }
+</style>
+</head>
+<body>
+
+<h1>Tile Debug — Interactive Reference</h1>
+
+<h2>1. Full Tileset (click any tile to see its index)</h2>
+<p class="note">12 columns × 5 rows. Green border = currently used in game. Click a tile to copy its ID.</p>
+
+<div class="tileset-grid" id="tileset-grid"></div>
+<div id="clicked-info" style="color: #e94560; font-size: 14px; margin: 8px 0;">Click a tile above to see details</div>
+
+<h2>2. Room Layout — Current Tile Assignments</h2>
+<p class="note">This shows a mock room with a corridor connecting from the right. Each cell shows the actual tile image, its role name, and tile index. <br>
+<strong style="color:#e94560;">To tell me what's wrong, say something like: "Position OUTER_TL should use T5 instead of T0"</strong></p>
+
+<div class="room-layout" id="room-layout"></div>
+
+<h2>3. Current Mapping Summary</h2>
+<p class="note">All tile assignments used in the autotile algorithm:</p>
+<table id="mapping-table">
+  <tr>
+    <th>Role</th>
+    <th>Position Description</th>
+    <th>Tile ID</th>
+    <th>1× Image</th>
+    <th>2× Image</th>
+    <th>Condition (when used)</th>
+  </tr>
+</table>
+
+<h2>4. Copy-Paste Summary</h2>
+<p class="note">Copy this and edit it to tell me exactly what to change:</p>
+<div id="output"></div>
+
+<h2>5. Interactive Map Editor</h2>
+<p class="note">
+  <strong style="color:#e94560;font-size:14px;">Click any tile on the map → then click a replacement tile from the picker below.</strong><br>
+  Green borders = tiles you changed. The minimap on the left shows the abstract layout — the tile map on the right shows actual tiles.
+</p>
+
+<div style="display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap;">
+
+  <!-- Minimap -->
+  <div>
+    <h3 style="color:#e94560; margin:0 0 8px 0; font-size:13px;">Abstract Layout (minimap)</h3>
+    <div class="minimap" id="minimap"></div>
+    <div style="margin-top:8px; font-size:11px; color:#888;">
+      <span style="display:inline-block;width:12px;height:12px;background:#222;border:1px solid #444;vertical-align:middle;"></span> Void &nbsp;
+      <span style="display:inline-block;width:12px;height:12px;background:#5a7a4a;border:1px solid #444;vertical-align:middle;"></span> Floor &nbsp;
+      <span style="display:inline-block;width:12px;height:12px;background:#6a5a3a;border:1px solid #444;vertical-align:middle;"></span> Wall &nbsp;
+      <span style="display:inline-block;width:12px;height:12px;background:#7a6a2a;border:1px solid #444;vertical-align:middle;"></span> Corner &nbsp;
+      <span style="display:inline-block;width:12px;height:12px;background:#4a5a7a;border:1px solid #444;vertical-align:middle;"></span> Inner Corner &nbsp;
+      <span style="display:inline-block;width:12px;height:12px;background:#4a7a7a;border:1px solid #444;vertical-align:middle;"></span> Corridor &nbsp;
+      <span style="display:inline-block;width:12px;height:12px;background:#7a4a6a;border:1px solid #444;vertical-align:middle;"></span> Door &nbsp;
+      <span style="display:inline-block;width:12px;height:12px;background:#8a8a3a;border:1px solid #444;vertical-align:middle;"></span> Stairs
+    </div>
+  </div>
+
+  <!-- Tile map -->
+  <div>
+    <h3 style="color:#e94560; margin:0 0 8px 0; font-size:13px;">Actual Tiles (click to edit)</h3>
+    <div class="map-grid" id="interactive-map"></div>
+  </div>
+
+</div>
+
+<div id="cell-info"><em>Click any tile on the map above</em></div>
+
+<p style="color:#e94560; font-weight:bold; margin-top:12px;">Pick a replacement tile:</p>
+<div class="picker-grid" id="tile-picker"></div>
+
+<p>
+  <button class="editor-btn" id="reset-btn">Reset All Changes</button>
+</p>
+
+<h2>6. Change Log</h2>
+<p class="note">This auto-updates as you make changes. Copy and paste everything in the box below back to me:</p>
+<div id="change-log">(no changes yet — click a map tile, then pick a replacement)</div>
+
+<script>
+// Tile index helper
+function tilePos(idx) {
+  const col = idx % 12;
+  const row = Math.floor(idx / 12);
+  return { col, row };
+}
+
+function bgPos1x(idx) {
+  const { col, row } = tilePos(idx);
+  return `${-col * 32}px ${-row * 32}px`;
+}
+function bgPos2x(idx) {
+  const { col, row } = tilePos(idx);
+  return `${-col * 64}px ${-row * 64}px`;
+}
+function bgPos48(idx) {
+  const { col, row } = tilePos(idx);
+  return `${-col * 48}px ${-row * 48}px`;
+}
+
+// Currently used tile indices
+const usedTiles = new Set([
+  0, 1, 2, 3, 4, 5,       // outer corners + top walls
+  6, 7, 8, 9,             // inner corners
+  11, 12, 13, 14, 15, 16, 17,
+  19,
+  23, 24, 25, 26, 27, 28, 29,
+  35, 36, 37, 38, 39, 40, 41, 42, 43,
+  47, 48, 49, 50, 51, 52, 53, 54,
+  55, 59
+]);
+
+// Build tileset grid
+const grid = document.getElementById('tileset-grid');
+for (let i = 0; i < 60; i++) {
+  const cell = document.createElement('div');
+  cell.className = 'tileset-cell' + (usedTiles.has(i) ? ' used' : '');
+  cell.style.backgroundPosition = bgPos2x(i);
+  cell.innerHTML = `<span class="idx">T${i}</span>`;
+  cell.onclick = () => {
+    document.getElementById('clicked-info').innerHTML =
+      `<strong>T${i}</strong> — col ${tilePos(i).col}, row ${tilePos(i).row} — pixel offset: (${tilePos(i).col*32}px, ${tilePos(i).row*32}px)`;
+  };
+  grid.appendChild(cell);
+}
+
+// Current mapping
+const mapping = [
+  // Room boundary corners (diagonal-only, no cardinal floor)
+  { role: 'INNER_TL', desc: 'Room boundary TL corner', tile: 0, condition: 'No cardinal floor, diagonal SE open' },
+  { role: 'INNER_TR', desc: 'Room boundary TR corner', tile: 5, condition: 'No cardinal floor, diagonal SW open' },
+  { role: 'INNER_BL', desc: 'Room boundary BL corner', tile: 48, condition: 'No cardinal floor, diagonal NE open' },
+  { role: 'INNER_BR', desc: 'Room boundary BR corner', tile: 53, condition: 'No cardinal floor, diagonal NW open' },
+
+  // Junction corners — top (count=2, diagonal OPEN, floor to S+side)
+  { role: 'OUTER_TL', desc: 'Top junction TL', tile: '1,2,3,4', condition: 'Floor to S+E, diagonal SE open → pick(TOP_WALL)' },
+  { role: 'OUTER_TR', desc: 'Top junction TR', tile: '1,2,3,4', condition: 'Floor to S+W, diagonal SW open → pick(TOP_WALL)' },
+
+  // Junction corners — bottom (count=2, diagonal OPEN, floor to N+side)
+  { role: 'OUTER_BL', desc: 'Bottom junction BL', tile: 8, condition: 'Floor to N+E, diagonal NE open' },
+  { role: 'OUTER_BR', desc: 'Bottom junction BR', tile: 6, condition: 'Floor to N+W, diagonal NW open' },
+
+  // Concave bend corners (count=2, diagonal CLOSED)
+  { role: 'JUNCTION_TL', desc: 'Concave bend TL', tile: 8, condition: 'Floor to S+E, diagonal SE CLOSED' },
+  { role: 'JUNCTION_TR', desc: 'Concave bend TR', tile: 2, condition: 'Floor to S+W, diagonal SW CLOSED' },
+  { role: 'JUNCTION_BL', desc: 'Concave bend BL', tile: 18, condition: 'Floor to N+E, diagonal NE CLOSED' },
+  { role: 'JUNCTION_BR', desc: 'Concave bend BR', tile: 6, condition: 'Floor to N+W, diagonal NW CLOSED' },
+
+  // Walls
+  { role: 'TOP_WALL', desc: 'Top wall (floor to south)', tile: '1,2,3,4', condition: 'Single open: floor to S' },
+  { role: 'BOTTOM_WALL', desc: 'Bottom wall (floor to north)', tile: '49,50,51,52', condition: 'Single open: floor to N' },
+  { role: 'LEFT_WALL', desc: 'Left wall (floor to east)', tile: '12,24,36', condition: 'Single open: floor to E' },
+  { role: 'RIGHT_WALL', desc: 'Right wall (floor to west)', tile: '17,29,41', condition: 'Single open: floor to W' },
+
+  // Floor types
+  { role: 'FLOOR', desc: 'Room floor tiles', tile: '13,14,15,16,25,26,27,28,37,38,39,40', condition: 'FLOOR type cell' },
+  { role: 'CORRIDOR', desc: 'Corridor floor', tile: '13,14,15,16,25,26,27,28,37,38,39,40', condition: 'CORRIDOR type cell (same as floor)' },
+  { role: 'DOOR', desc: 'Door/transition tiles', tile: '13,14,15,16,25,26,27,28,37,38,39,40', condition: 'DOOR type cell (floor variant)' },
+  { role: 'STAIRS', desc: 'Staircase', tile: '42,54', condition: 'STAIRS type cell' },
+  { role: 'SPAWNER', desc: 'Spawner pad', tile: 43, condition: 'SPAWNER_PAD type cell' },
+  { role: 'VOID', desc: 'Empty/void', tile: 19, condition: 'VOID type or fully enclosed wall' },
+];
+
+// Build mapping table
+const table = document.getElementById('mapping-table');
+mapping.forEach(m => {
+  const tiles = String(m.tile).split(',').map(Number);
+  const firstTile = tiles[0];
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><strong>${m.role}</strong></td>
+    <td>${m.desc}</td>
+    <td>T${m.tile}</td>
+    <td><div class="tile-inline" style="background-position: ${bgPos1x(firstTile)}"></div>${tiles.length > 1 ? ` +${tiles.length-1} variants` : ''}</td>
+    <td><div class="tile-inline-2x" style="background-position: ${bgPos2x(firstTile)}"></div></td>
+    <td style="font-size:11px; color:#888;">${m.condition}</td>
+  `;
+  table.appendChild(tr);
+});
+
+// Build room layout
+// Mock layout: 11×9 grid showing a room (cols 1-5, rows 1-5) with corridor (cols 7-9, row 3)
+const layout = [
+  // row 0: void + top walls
+  ['VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19],
+  // row 1: TL corner, top wall, TR corner
+  ['VOID',19, 'OUTER_TL',0, 'TOP_WALL',1, 'TOP_WALL',2, 'TOP_WALL',3, 'OUTER_TR',5, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19],
+  // row 2: left wall, floor, floor, floor, right wall
+  ['VOID',19, 'LEFT_WALL',12, 'FLOOR',13, 'FLOOR',14, 'FLOOR',15, 'RIGHT_WALL',17, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19],
+  // row 3: left wall, floor, floor, floor, INNER corner, top wall corridor, top wall, top wall, corner
+  ['VOID',19, 'LEFT_WALL',24, 'FLOOR',25, 'FLOOR',26, 'FLOOR',27, 'INNER_TR',7, 'TOP_WALL',1, 'TOP_WALL',2, 'TOP_WALL',3, 'OUTER_TR',5, 'VOID',19],
+  // row 4: left wall, floor, floor, floor, floor=corridor, CORRIDOR',38, CORRIDOR, CORRIDOR, right wall
+  ['VOID',19, 'LEFT_WALL',36, 'FLOOR',37, 'FLOOR',38, 'FLOOR',39, 'DOOR',11, 'CORRIDOR',26, 'CORRIDOR',27, 'CORRIDOR',28, 'RIGHT_WALL',29, 'VOID',19],
+  // row 5: left wall, floor, floor, floor, INNER corner, bottom wall, bottom wall, bottom wall, corner
+  ['VOID',19, 'LEFT_WALL',12, 'FLOOR',40, 'FLOOR',13, 'FLOOR',14, 'INNER_BR',9, 'BOTTOM_WALL',49, 'BOTTOM_WALL',50, 'BOTTOM_WALL',51, 'OUTER_BR',53, 'VOID',19],
+  // row 6: BL corner, bottom wall, bottom wall, bottom wall, BR corner
+  ['VOID',19, 'OUTER_BL',48, 'BOTTOM_WALL',49, 'BOTTOM_WALL',50, 'BOTTOM_WALL',51, 'OUTER_BR',53, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19],
+  // row 7
+  ['VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19, 'VOID',19],
+  // row 8 - inner corner demo with separate corridor
+  ['VOID',19, 'VOID',19, 'INNER_TL',6, 'INNER_TR',7, 'VOID',19, 'VOID',19, 'INNER_BL',8, 'INNER_BR',9, 'VOID',19, 'VOID',19, 'VOID',19],
+];
+
+const cellClasses = {
+  'VOID': 'void-cell',
+  'FLOOR': 'floor-cell',
+  'CORRIDOR': 'corridor-cell',
+  'DOOR': 'door-cell',
+  'TOP_WALL': 'wall-cell', 'BOTTOM_WALL': 'wall-cell', 'LEFT_WALL': 'wall-cell', 'RIGHT_WALL': 'wall-cell',
+  'OUTER_TL': 'corner-cell', 'OUTER_TR': 'corner-cell', 'OUTER_BL': 'corner-cell', 'OUTER_BR': 'corner-cell',
+  'INNER_TL': 'inner-corner-cell', 'INNER_TR': 'inner-corner-cell', 'INNER_BL': 'inner-corner-cell', 'INNER_BR': 'inner-corner-cell',
+};
+
+const roomLayout = document.getElementById('room-layout');
+for (let r = 0; r < layout.length; r++) {
+  const rowData = layout[r];
+  for (let i = 0; i < rowData.length; i += 2) {
+    const role = rowData[i];
+    const tileIdx = rowData[i + 1];
+    const cell = document.createElement('div');
+    cell.className = 'room-cell ' + (cellClasses[role] || '');
+
+    const preview = document.createElement('div');
+    preview.className = 'tile-preview';
+    preview.style.backgroundPosition = bgPos48(tileIdx);
+    cell.appendChild(preview);
+
+    const label = document.createElement('div');
+    label.className = 'cell-label';
+    label.textContent = role;
+    cell.appendChild(label);
+
+    const tid = document.createElement('div');
+    tid.className = 'tile-id';
+    tid.textContent = `T${tileIdx}`;
+    cell.appendChild(tid);
+
+    roomLayout.appendChild(cell);
+  }
+}
+
+// Output summary for copy-paste
+const output = document.getElementById('output');
+let text = 'CURRENT TILE ASSIGNMENTS (edit and paste back to me):\n\n';
+text += 'ROOM BOUNDARY CORNERS (diagonal-only):\n';
+text += '  INNER_TL = T0\n  INNER_TR = T5\n  INNER_BL = T48\n  INNER_BR = T53\n\n';
+text += 'JUNCTION CORNERS (top, diag open → pick TOP_WALL):\n';
+text += '  OUTER_TL = T1,T2,T3,T4\n  OUTER_TR = T1,T2,T3,T4\n';
+text += 'JUNCTION CORNERS (bottom, diag open):\n';
+text += '  OUTER_BL = T8\n  OUTER_BR = T6\n\n';
+text += 'WALLS:\n';
+text += '  TOP_WALL = T1, T2, T3, T4 (floor to south)\n';
+text += '  BOTTOM_WALL = T49, T50, T51, T52 (floor to north)\n';
+text += '  LEFT_WALL = T12, T24, T36 (floor to east)\n';
+text += '  RIGHT_WALL = T17, T29, T41 (floor to west)\n\n';
+text += 'FLOOR:\n';
+text += '  FLOOR = T13, T14, T15, T16, T25, T26, T27, T28, T37, T38, T39, T40\n';
+text += '  CORRIDOR = same as FLOOR\n';
+text += '  DOOR = floor tiles (T13-T16, T25-T28, T37-T40)\n';
+text += '  STAIRS = T42, T54\n';
+text += '  SPAWNER = T43\n';
+text += '  VOID = T19\n';
+output.textContent = text;
+
+// ═══════════════════════════════════════════════════════
+// SECTION 5: Interactive Map Editor
+// ═══════════════════════════════════════════════════════
+
+// The interactive map: a 15×15 grid — two rooms connected by corridors in all directions
+// Each cell stores: { role, tileIdx, originalIdx }
+const mapCols = 15;
+const mapRows = 15;
+const mapData = [];
+const changeLog = []; // track all changes
+
+// Layout: 3 rooms connected by 2 corridors — all rooms fully reachable.
+// Room A (top-left, 5×5 floor) → right corridor → Room B (right, 3×3 floor)
+// Room A → down corridor → Room C (bottom, 5×3 floor with stairs)
+// Tests: all 4 outer corners, all 4 inner corners, all wall types, doors, stairs, corridors.
+// Walkable path: RoomA(4,6)→D(4,7)→C(4,8)→D(4,9)→RoomB(4,10)
+//                RoomA(6,4)→D(7,4)→C(8,4)→D(9,4)→RoomC(10,4)
+const mapTemplate = [
+  // col:  0    1     2    3    4    5    6    7    8    9   10   11   12   13   14
+  /*r0*/ ['V', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V'],
+  /*r1*/ ['V','ITL','TW','TW','TW','TW','TW','ITR','V', 'V', 'V', 'V', 'V', 'V', 'V'],
+  /*r2*/ ['V','LW', 'F', 'F', 'F', 'F', 'F','RW', 'V','ITL','TW','TW','TW','ITR','V'],
+  /*r3*/ ['V','LW', 'F', 'F', 'F', 'F', 'F','OTR','TW','OTL','F', 'F', 'F','RW', 'V'],
+  /*r4*/ ['V','LW', 'F', 'F', 'F', 'F', 'F', 'D', 'C', 'D', 'F', 'F', 'F','RW', 'V'],
+  /*r5*/ ['V','LW', 'F', 'F', 'F', 'F', 'F','OBR','BW','OBL','F', 'F', 'F','RW', 'V'],
+  /*r6*/ ['V','LW', 'F', 'F', 'F', 'F', 'F','RW', 'V','IBL','BW','BW','BW','IBR','V'],
+  /*r7*/ ['V','IBL','BW','OBL','D','OBR','BW','IBR','V', 'V', 'V', 'V', 'V', 'V', 'V'],
+  /*r8*/ ['V', 'V', 'V','LW', 'C','RW', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V'],
+  /*r9*/ ['V','ITL','TW','OTL','D','OTR','TW','ITR','V', 'V', 'V', 'V', 'V', 'V', 'V'],
+  /*r10*/['V','LW', 'F', 'F', 'F', 'F', 'F','RW', 'V', 'V', 'V', 'V', 'V', 'V', 'V'],
+  /*r11*/['V','LW', 'F', 'F', 'S', 'F', 'F','RW', 'V', 'V', 'V', 'V', 'V', 'V', 'V'],
+  /*r12*/['V','LW', 'F', 'F', 'F', 'F', 'F','RW', 'V', 'V', 'V', 'V', 'V', 'V', 'V'],
+  /*r13*/['V','IBL','BW','BW','BW','BW','BW','IBR','V', 'V', 'V', 'V', 'V', 'V', 'V'],
+  /*r14*/['V', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V', 'V'],
+];
+
+// Default tile indices per role — updated with user corrections
+const defaultTiles = {
+  'V': 19,
+  'F': 14, 'C': 26, 'D': 15, 'S': 42,
+  'OTL': 1, 'OTR': 3, 'OBL': 8, 'OBR': 6,
+  'ITL': 0, 'ITR': 5, 'IBL': 48, 'IBR': 53,
+  'TW': 2, 'BW': 50, 'LW': 24, 'RW': 29,
+};
+const roleNames = {
+  'V': 'VOID', 'F': 'FLOOR', 'C': 'CORRIDOR', 'D': 'DOOR', 'S': 'STAIRS',
+  'OTL': 'OUTER_TL', 'OTR': 'OUTER_TR', 'OBL': 'OUTER_BL', 'OBR': 'OUTER_BR',
+  'ITL': 'INNER_TL', 'ITR': 'INNER_TR', 'IBL': 'INNER_BL', 'IBR': 'INNER_BR',
+  'TW': 'TOP_WALL', 'BW': 'BOT_WALL', 'LW': 'LEFT_WALL', 'RW': 'RIGHT_WALL',
+};
+const roleBg = {
+  'V': '#0a0a12', 'F': '#151f15', 'C': '#151a1f', 'D': '#1f151a', 'S': '#1f1f15',
+  'OTL': '#2a2a1a', 'OTR': '#2a2a1a', 'OBL': '#2a2a1a', 'OBR': '#2a2a1a',
+  'ITL': '#1a1a2a', 'ITR': '#1a1a2a', 'IBL': '#1a1a2a', 'IBR': '#1a1a2a',
+  'TW': '#2a1515', 'BW': '#2a1515', 'LW': '#2a1515', 'RW': '#2a1515',
+};
+
+// Init map data
+for (let r = 0; r < mapRows; r++) {
+  mapData[r] = [];
+  for (let c = 0; c < mapCols; c++) {
+    const role = mapTemplate[r][c];
+    const tileIdx = defaultTiles[role];
+    mapData[r][c] = { role, tileIdx, originalIdx: tileIdx };
+  }
+}
+
+// ── Minimap ──
+const miniColors = {
+  'V': '#222',
+  'F': '#5a7a4a', 'C': '#4a7a7a', 'D': '#7a4a6a', 'S': '#8a8a3a',
+  'OTL': '#7a6a2a', 'OTR': '#7a6a2a', 'OBL': '#7a6a2a', 'OBR': '#7a6a2a',
+  'ITL': '#4a5a7a', 'ITR': '#4a5a7a', 'IBL': '#4a5a7a', 'IBR': '#4a5a7a',
+  'TW': '#6a5a3a', 'BW': '#6a5a3a', 'LW': '#6a5a3a', 'RW': '#6a5a3a',
+};
+const miniLabels = {
+  'V': '', 'F': 'F', 'C': 'C', 'D': 'D', 'S': 'S',
+  'OTL': 'OTL', 'OTR': 'OTR', 'OBL': 'OBL', 'OBR': 'OBR',
+  'ITL': 'ITL', 'ITR': 'ITR', 'IBL': 'IBL', 'IBR': 'IBR',
+  'TW': 'TW', 'BW': 'BW', 'LW': 'LW', 'RW': 'RW',
+};
+
+const minimapEl = document.getElementById('minimap');
+minimapEl.style.gridTemplateColumns = `repeat(${mapCols}, 32px)`;
+
+function renderMinimap() {
+  minimapEl.innerHTML = '';
+  for (let r = 0; r < mapRows; r++) {
+    for (let c = 0; c < mapCols; c++) {
+      const role = mapTemplate[r][c];
+      const cell = document.createElement('div');
+      cell.className = 'mini-cell';
+      if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
+        cell.classList.add('mini-selected');
+      }
+      cell.style.background = miniColors[role] || '#222';
+      cell.innerHTML = `<span class="mini-role">${miniLabels[role] || ''}</span>`;
+      cell.addEventListener('click', () => {
+        onMapCellClick(r, c);
+        renderMinimap();
+      });
+      minimapEl.appendChild(cell);
+    }
+  }
+}
+
+// Render the interactive map
+const mapContainer = document.getElementById('interactive-map');
+const CELL_SIZE = 64;
+let selectedCell = null;
+
+function bgPosMap(idx) {
+  const col = idx % 12;
+  const row = Math.floor(idx / 12);
+  return `${-col * CELL_SIZE}px ${-row * CELL_SIZE}px`;
+}
+
+function renderMap() {
+  mapContainer.innerHTML = '';
+  for (let r = 0; r < mapRows; r++) {
+    for (let c = 0; c < mapCols; c++) {
+      const d = mapData[r][c];
+      const cell = document.createElement('div');
+      cell.className = 'map-cell';
+      cell.dataset.row = r;
+      cell.dataset.col = c;
+      cell.style.backgroundPosition = bgPosMap(d.tileIdx);
+
+      // Highlight changed cells
+      if (d.tileIdx !== d.originalIdx) {
+        cell.classList.add('map-cell-changed');
+      }
+      if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
+        cell.classList.add('map-cell-selected');
+      }
+
+      // Role label
+      const label = document.createElement('div');
+      label.className = 'map-label';
+      label.textContent = roleNames[d.role];
+      cell.appendChild(label);
+
+      // Tile index label
+      const tidLabel = document.createElement('div');
+      tidLabel.className = 'map-tid';
+      tidLabel.textContent = 'T' + d.tileIdx;
+      if (d.tileIdx !== d.originalIdx) {
+        tidLabel.innerHTML = `<s style="color:#666">T${d.originalIdx}</s> → T${d.tileIdx}`;
+      }
+      cell.appendChild(tidLabel);
+
+      cell.addEventListener('click', () => onMapCellClick(r, c));
+      mapContainer.appendChild(cell);
+    }
+  }
+}
+
+function onMapCellClick(r, c) {
+  selectedCell = { r, c };
+  renderMap();
+  renderMinimap();
+
+  const d = mapData[r][c];
+  const infoEl = document.getElementById('cell-info');
+  infoEl.innerHTML = `
+    <strong>Selected:</strong> Row ${r}, Col ${c}<br>
+    <strong>Role:</strong> ${roleNames[d.role]}<br>
+    <strong>Current Tile:</strong> T${d.tileIdx} (col ${tilePos(d.tileIdx).col}, row ${tilePos(d.tileIdx).row})<br>
+    <strong>Original Tile:</strong> T${d.originalIdx}<br>
+    <span style="color:#e94560">Click a tile below to assign it to this cell:</span>
+  `;
+
+  // Highlight current tile in the picker
+  renderPicker(d.tileIdx);
+}
+
+function renderPicker(currentIdx) {
+  const picker = document.getElementById('tile-picker');
+  picker.innerHTML = '';
+  for (let i = 0; i < 60; i++) {
+    const t = document.createElement('div');
+    t.className = 'picker-tile';
+    if (i === currentIdx) t.classList.add('picker-current');
+    t.style.backgroundPosition = bgPosMap(i);
+    t.innerHTML = `<span class="picker-idx">T${i}</span>`;
+    t.addEventListener('click', () => onPickerTileClick(i));
+    picker.appendChild(t);
+  }
+}
+
+function onPickerTileClick(tileIdx) {
+  if (!selectedCell) return;
+  const { r, c } = selectedCell;
+  const d = mapData[r][c];
+  const oldIdx = d.tileIdx;
+  if (oldIdx === tileIdx) return;
+
+  d.tileIdx = tileIdx;
+
+  // Log the change
+  changeLog.push({
+    row: r, col: c,
+    role: roleNames[d.role],
+    from: oldIdx, to: tileIdx,
+  });
+
+  renderMap();
+  renderPicker(tileIdx);
+  updateChangeLog();
+
+  // Update info
+  const infoEl = document.getElementById('cell-info');
+  infoEl.innerHTML = `
+    <strong>Selected:</strong> Row ${r}, Col ${c}<br>
+    <strong>Role:</strong> ${roleNames[d.role]}<br>
+    <strong>Current Tile:</strong> T${d.tileIdx} (col ${tilePos(d.tileIdx).col}, row ${tilePos(d.tileIdx).row})<br>
+    <strong>Original Tile:</strong> T${d.originalIdx}<br>
+    <span style="color:#4eff4e">✓ Changed from T${oldIdx} to T${tileIdx}</span>
+  `;
+}
+
+function updateChangeLog() {
+  const logEl = document.getElementById('change-log');
+  if (changeLog.length === 0) {
+    logEl.textContent = '(no changes yet — click a map tile, then pick a replacement)';
+    return;
+  }
+
+  // Build a summary grouped by role
+  const byRole = {};
+  // Walk the full map to find current state vs original
+  for (let r = 0; r < mapRows; r++) {
+    for (let c = 0; c < mapCols; c++) {
+      const d = mapData[r][c];
+      if (d.tileIdx !== d.originalIdx) {
+        const key = roleNames[d.role];
+        if (!byRole[key]) byRole[key] = [];
+        byRole[key].push({ from: d.originalIdx, to: d.tileIdx, r, c });
+      }
+    }
+  }
+
+  let txt = '=== CHANGES TO SEND TO CLAUDE ===\n';
+  txt += '(copy everything below this line)\n\n';
+  for (const [role, changes] of Object.entries(byRole)) {
+    // Deduplicate: if all changes for a role have the same from→to, summarize
+    const unique = {};
+    changes.forEach(ch => {
+      const key = `T${ch.from}→T${ch.to}`;
+      unique[key] = (unique[key] || 0) + 1;
+    });
+    for (const [change, count] of Object.entries(unique)) {
+      txt += `${role}: ${change}`;
+      if (count > 1) txt += ` (×${count})`;
+      txt += '\n';
+    }
+  }
+  txt += '\n=== END CHANGES ===';
+  logEl.textContent = txt;
+}
+
+// Reset button
+document.getElementById('reset-btn').addEventListener('click', () => {
+  for (let r = 0; r < mapRows; r++) {
+    for (let c = 0; c < mapCols; c++) {
+      mapData[r][c].tileIdx = mapData[r][c].originalIdx;
+    }
+  }
+  changeLog.length = 0;
+  selectedCell = null;
+  renderMap();
+  renderMinimap();
+  updateChangeLog();
+  document.getElementById('cell-info').innerHTML = '<em>Click any tile on the map above</em>';
+  document.getElementById('tile-picker').innerHTML = '';
+});
+
+// Initial render
+renderMap();
+renderMinimap();
+updateChangeLog();
+</script>
+
+</body>
+</html>

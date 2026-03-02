@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug - The Gauntlet of Eternity</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #111; color: #0f0; font-family: monospace; padding: 20px; }
+        #errors { white-space: pre-wrap; font-size: 14px; }
+        canvas { display: block; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div id="errors">Waiting for errors...<br></div>
+    <script>
+        const errDiv = document.getElementById('errors');
+        function log(msg) { errDiv.textContent += msg + '\n'; }
+        window.onerror = function(msg, url, line, col, err) {
+            log('ERROR: ' + msg);
+            log('  File: ' + url + ':' + line + ':' + col);
+            if (err && err.stack) log('  Stack: ' + err.stack);
+            return false;
+        };
+        window.addEventListener('unhandledrejection', function(e) {
+            log('UNHANDLED REJECTION: ' + e.reason);
+            if (e.reason && e.reason.stack) log('  Stack: ' + e.reason.stack);
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+    <script>log('Phaser loaded: ' + (typeof Phaser !== 'undefined'));</script>
+    <script type="module" src="src/main.js"></script>
+    <script>log('Module import initiated');</script>
+</body>
+</html>

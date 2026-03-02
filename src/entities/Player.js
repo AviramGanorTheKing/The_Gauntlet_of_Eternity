@@ -391,13 +391,40 @@ export class KeyboardMouseInput extends InputSource {
             left: Phaser.Input.Keyboard.KeyCodes.A,
             right: Phaser.Input.Keyboard.KeyCodes.D,
             dodge: Phaser.Input.Keyboard.KeyCodes.SPACE,
+            dodgeAlt: Phaser.Input.Keyboard.KeyCodes.SHIFT,
+            attack: Phaser.Input.Keyboard.KeyCodes.SPACE,
             special: Phaser.Input.Keyboard.KeyCodes.E,
             potion: Phaser.Input.Keyboard.KeyCodes.Q,
             mpotion: Phaser.Input.Keyboard.KeyCodes.R,
         });
 
+        // Aim mode: 'mouse' (default) or 'movement'
+        // In 'movement' mode: spacebar attacks, shift dodges, aim follows WASD
+        this.aimMode = 'mouse';
+
+        // Track last movement direction for movement-based aiming
+        this._lastMoveDir = { x: 0, y: 1 }; // Default facing south
+
         this._dodgePressed = false;
-        scene.input.keyboard.on('keydown-SPACE', () => { this._dodgePressed = true; });
+        this._attackPressed = false;
+
+        // Listen for both spacebar and shift for mode-dependent actions
+        scene.input.keyboard.on('keydown-SPACE', () => {
+            if (this.aimMode === 'mouse') {
+                this._dodgePressed = true;
+            } else {
+                this._attackPressed = true;
+            }
+        });
+        scene.input.keyboard.on('keydown-SHIFT', () => {
+            if (this.aimMode === 'movement') {
+                this._dodgePressed = true;
+            }
+        });
+    }
+
+    setAimMode(mode) {
+        this.aimMode = mode === 'movement' ? 'movement' : 'mouse';
     }
 
     getMovement() {
@@ -406,10 +433,23 @@ export class KeyboardMouseInput extends InputSource {
         if (this.keys.right.isDown) x += 1;
         if (this.keys.up.isDown) y -= 1;
         if (this.keys.down.isDown) y += 1;
+
+        // Update last movement direction if moving
+        if (x !== 0 || y !== 0) {
+            const len = Math.sqrt(x * x + y * y);
+            this._lastMoveDir = { x: x / len, y: y / len };
+        }
+
         return { x, y };
     }
 
     getAimDirection() {
+        // Movement mode: use last movement direction
+        if (this.aimMode === 'movement') {
+            return { x: this._lastMoveDir.x, y: this._lastMoveDir.y };
+        }
+
+        // Mouse mode: aim at cursor
         const pointer = this.scene.input.activePointer;
         const player = this.scene.player;
         if (!player) return { x: 0, y: 0 };
@@ -425,7 +465,18 @@ export class KeyboardMouseInput extends InputSource {
         return { x: dx / len, y: dy / len };
     }
 
-    isAttackPressed() { return this.scene.input.activePointer.isDown; }
+    isAttackPressed() {
+        // Movement mode: spacebar attacks (one-shot per press)
+        if (this.aimMode === 'movement') {
+            if (this._attackPressed) {
+                this._attackPressed = false;
+                return true;
+            }
+            return false;
+        }
+        // Mouse mode: hold mouse button to attack
+        return this.scene.input.activePointer.isDown;
+    }
 
     isDodgePressed() {
         if (this._dodgePressed) { this._dodgePressed = false; return true; }

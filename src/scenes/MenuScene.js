@@ -1,4 +1,5 @@
 import { applyCRTShader } from '../shaders/CRTShader.js';
+import { PauseScene } from './PauseScene.js';
 
 /**
  * MenuScene — Title screen with CRT-styled visuals.
@@ -388,7 +389,7 @@ export class MenuScene extends Phaser.Scene {
         this.menuItems = [
             { label: 'NEW GAME', action: () => this._startGame() },
             { label: 'CONTINUE', action: () => this._continueGame() },
-            { label: 'SETTINGS', action: () => {} },
+            { label: 'SETTINGS', action: () => this._openSettings() },
             { label: 'VIEW INTRO', action: () => this._viewIntro() },
         ];
 
@@ -549,6 +550,180 @@ export class MenuScene extends Phaser.Scene {
     _viewIntro() {
         this._crtGlitchWipe(() => {
             this.scene.start('IntroScene');
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  SETTINGS PANEL — Overlay for game settings
+    // ══════════════════════════════════════════════════════════════════════════
+
+    _openSettings() {
+        if (this._settingsOpen) return;
+        this._settingsOpen = true;
+
+        const W = this.game.config.width;
+        const H = this.game.config.height;
+
+        // Settings container
+        this._settingsContainer = this.add.container(W / 2, H / 2).setDepth(100);
+
+        // Dark overlay
+        const overlay = this.add.rectangle(0, 0, W, H, 0x000000, 0.7);
+        this._settingsContainer.add(overlay);
+
+        // Panel background
+        const panelW = 450;
+        const panelH = 320;
+        const panelBg = this.add.graphics();
+        panelBg.fillStyle(0x111122, 0.95);
+        panelBg.fillRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 10);
+        panelBg.lineStyle(2, 0x445588, 1);
+        panelBg.strokeRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 10);
+        this._settingsContainer.add(panelBg);
+
+        // Title
+        const title = this.add.text(0, -panelH / 2 + 20, 'SETTINGS', {
+            fontFamily: 'monospace', fontSize: '18px',
+            color: '#ffdd00', stroke: '#000', strokeThickness: 3,
+        }).setOrigin(0.5);
+        this._settingsContainer.add(title);
+
+        // Load settings
+        const settings = PauseScene.loadSettings();
+        const colX = -panelW / 2 + 40;
+        const sliderW = 200;
+
+        // Helper: create slider
+        const makeSlider = (label, y, initial, color, onChange) => {
+            const lbl = this.add.text(colX, y, label, {
+                fontFamily: 'monospace', fontSize: '11px', color: '#cccccc',
+            });
+            this._settingsContainer.add(lbl);
+
+            const trackY = y + 20;
+            const track = this.add.graphics();
+            track.fillStyle(0x333344, 1);
+            track.fillRect(colX, trackY, sliderW, 8);
+            track.lineStyle(1, 0x555566, 1);
+            track.strokeRect(colX, trackY, sliderW, 8);
+            this._settingsContainer.add(track);
+
+            const knob = this.add.rectangle(
+                colX + sliderW * initial, trackY + 4, 12, 16, color
+            ).setInteractive({ draggable: true });
+            this._settingsContainer.add(knob);
+
+            const valLabel = this.add.text(colX + sliderW + 15, trackY - 2,
+                `${Math.round(initial * 100)}%`, {
+                fontFamily: 'monospace', fontSize: '10px',
+                color: '#' + color.toString(16).padStart(6, '0'),
+            });
+            this._settingsContainer.add(valLabel);
+
+            knob.on('drag', (pointer, dragX) => {
+                const localX = Phaser.Math.Clamp(dragX, colX, colX + sliderW);
+                knob.x = localX;
+                const pct = (localX - colX) / sliderW;
+                valLabel.setText(`${Math.round(pct * 100)}%`);
+                onChange(pct);
+            });
+        };
+
+        // CRT Intensity slider
+        makeSlider('CRT Effect Intensity:', -panelH / 2 + 55, settings.crtIntensity, 0xffdd00, (pct) => {
+            settings.crtIntensity = pct;
+            PauseScene.saveSettings(settings);
+            if (this.crtPipeline) this.crtPipeline.setIntensity(pct);
+        });
+
+        // Music Volume slider
+        makeSlider('Music Volume:', -panelH / 2 + 110, settings.musicVolume, 0x88aaff, (pct) => {
+            settings.musicVolume = pct;
+            PauseScene.saveSettings(settings);
+        });
+
+        // SFX Volume slider
+        makeSlider('SFX Volume:', -panelH / 2 + 165, settings.sfxVolume, 0xffaa66, (pct) => {
+            settings.sfxVolume = pct;
+            PauseScene.saveSettings(settings);
+        });
+
+        // ── Aim Mode Toggle ───────────────────────────────────────────────
+        const aimModeY = -panelH / 2 + 220;
+        const aimModeLabel = this.add.text(colX, aimModeY, 'Aim Mode:', {
+            fontFamily: 'monospace', fontSize: '11px', color: '#cccccc',
+        });
+        this._settingsContainer.add(aimModeLabel);
+
+        const aimModeLabels = { mouse: 'MOUSE AIM', movement: 'MOVEMENT AIM' };
+
+        const aimModeToggle = this.add.text(colX + 150, aimModeY,
+            `[${aimModeLabels[settings.aimMode] || 'MOUSE AIM'}]`, {
+            fontFamily: 'monospace', fontSize: '10px',
+            color: settings.aimMode === 'mouse' ? '#88aaff' : '#ffaa44',
+            stroke: '#000', strokeThickness: 1,
+        }).setInteractive();
+        this._settingsContainer.add(aimModeToggle);
+
+        // Keybind info
+        const keybindInfo = this.add.text(colX, aimModeY + 20, '', {
+            fontFamily: 'monospace', fontSize: '9px', color: '#666688',
+        });
+        this._settingsContainer.add(keybindInfo);
+
+        const updateKeybindInfo = () => {
+            if (settings.aimMode === 'mouse') {
+                keybindInfo.setText('Attack: Mouse Click  |  Dodge: Spacebar');
+            } else {
+                keybindInfo.setText('Attack: Spacebar  |  Dodge: Shift');
+            }
+        };
+        updateKeybindInfo();
+
+        aimModeToggle.on('pointerdown', () => {
+            settings.aimMode = settings.aimMode === 'mouse' ? 'movement' : 'mouse';
+            aimModeToggle.setText(`[${aimModeLabels[settings.aimMode]}]`);
+            aimModeToggle.setColor(settings.aimMode === 'mouse' ? '#88aaff' : '#ffaa44');
+            updateKeybindInfo();
+            PauseScene.saveSettings(settings);
+        });
+
+        // ── Close Button ──────────────────────────────────────────────────
+        const closeBtn = this.add.text(0, panelH / 2 - 30, '[ CLOSE ]', {
+            fontFamily: 'monospace', fontSize: '13px',
+            color: '#44ff44', stroke: '#000', strokeThickness: 2,
+            backgroundColor: '#113311', padding: { x: 15, y: 6 },
+        }).setOrigin(0.5).setInteractive();
+        closeBtn.on('pointerover', () => closeBtn.setColor('#66ff66'));
+        closeBtn.on('pointerout', () => closeBtn.setColor('#44ff44'));
+        closeBtn.on('pointerdown', () => this._closeSettings());
+        this._settingsContainer.add(closeBtn);
+
+        // ESC to close
+        this._settingsEscHandler = () => this._closeSettings();
+        this.input.keyboard.once('keydown-ESC', this._settingsEscHandler);
+
+        // Open animation
+        this._settingsContainer.setScale(0.3).setAlpha(0);
+        this.tweens.add({
+            targets: this._settingsContainer,
+            scaleX: 1, scaleY: 1, alpha: 1,
+            duration: 200, ease: 'Back.easeOut'
+        });
+    }
+
+    _closeSettings() {
+        if (!this._settingsOpen) return;
+
+        this.tweens.add({
+            targets: this._settingsContainer,
+            scaleX: 0.3, scaleY: 0.3, alpha: 0,
+            duration: 150, ease: 'Power2',
+            onComplete: () => {
+                this._settingsContainer.destroy();
+                this._settingsContainer = null;
+                this._settingsOpen = false;
+            }
         });
     }
 

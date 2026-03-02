@@ -186,7 +186,9 @@ export class GameScene extends Phaser.Scene {
         if (!this.player) {
             const PlayerClass = PLAYER_CLASSES[this.classKey] || Warrior;
             this.player = new PlayerClass(this, floorData.startPosition.x, floorData.startPosition.y);
-            this.player.setInputSource(new KeyboardMouseInput(this));
+            const inputSource = new KeyboardMouseInput(this);
+            inputSource.setAimMode(PauseScene.loadSettings().aimMode || 'mouse');
+            this.player.setInputSource(inputSource);
 
             this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
             this.cameras.main.setZoom(GameConfig.CAMERA_ZOOM);

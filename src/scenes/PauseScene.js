@@ -785,6 +785,57 @@ export class PauseScene extends Phaser.Scene {
         this._panelContainer.add(hintsToggle);
         items.push(hintsToggle);
 
+        // ── Aim Mode Toggle ───────────────────────────────────────────────
+        const aimModeLabel = this.add.text(colX, contentY + 215, 'Aim Mode:', {
+            fontFamily: 'monospace', fontSize: '11px', color: '#cccccc',
+        });
+        this._panelContainer.add(aimModeLabel);
+        items.push(aimModeLabel);
+
+        const aimModeLabels = {
+            mouse: 'MOUSE AIM',
+            movement: 'MOVEMENT AIM'
+        };
+
+        const aimModeToggle = this.add.text(colX + 150, contentY + 215,
+            `[${aimModeLabels[settings.aimMode] || 'MOUSE AIM'}]`, {
+            fontFamily: 'monospace', fontSize: '10px',
+            color: settings.aimMode === 'mouse' ? '#88aaff' : '#ffaa44',
+            stroke: '#000', strokeThickness: 1,
+        }).setInteractive();
+
+        // Keybind info text (updates based on mode)
+        const keybindInfo = this.add.text(colX, contentY + 240, '', {
+            fontFamily: 'monospace', fontSize: '9px', color: '#666688',
+        });
+        this._panelContainer.add(keybindInfo);
+        items.push(keybindInfo);
+
+        const updateKeybindInfo = () => {
+            if (settings.aimMode === 'mouse') {
+                keybindInfo.setText('Attack: Mouse Click  |  Dodge: Spacebar');
+            } else {
+                keybindInfo.setText('Attack: Spacebar  |  Dodge: Shift');
+            }
+        };
+        updateKeybindInfo();
+
+        aimModeToggle.on('pointerdown', () => {
+            settings.aimMode = settings.aimMode === 'mouse' ? 'movement' : 'mouse';
+            aimModeToggle.setText(`[${aimModeLabels[settings.aimMode]}]`);
+            aimModeToggle.setColor(settings.aimMode === 'mouse' ? '#88aaff' : '#ffaa44');
+            updateKeybindInfo();
+            PauseScene.saveSettings(settings);
+
+            // Apply to player input source immediately
+            const gameScene = this.scene.get('GameScene');
+            if (gameScene?.player?.inputSource?.setAimMode) {
+                gameScene.player.inputSource.setAimMode(settings.aimMode);
+            }
+        });
+        this._panelContainer.add(aimModeToggle);
+        items.push(aimModeToggle);
+
         this._tabContents['SETTINGS'] = items;
     }
 
@@ -805,7 +856,7 @@ export class PauseScene extends Phaser.Scene {
     }
 
     static defaultSettings() {
-        return { crtIntensity: 0.7, musicVolume: 0.8, sfxVolume: 1.0, hintsEnabled: true };
+        return { crtIntensity: 0.7, musicVolume: 0.8, sfxVolume: 1.0, hintsEnabled: true, aimMode: 'mouse' };
     }
 
     // ══════════════════════════════════════════════════════════════════════════

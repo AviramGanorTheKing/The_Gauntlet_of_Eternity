@@ -766,8 +766,17 @@ export class GameScene extends Phaser.Scene {
         // Create trigger zone at boss room entrance
         const triggerWidth = bossRoom.w * ts * 0.6;
         const triggerHeight = bossRoom.h * ts * 0.6;
+
+        console.log('[GameScene] Setting up boss trigger zone:', {
+            bossRoom, bx, by, triggerWidth, triggerHeight, bossInfo: bossInfo.name
+        });
+
         this._bossTriggerZone = this.add.zone(bx, by, triggerWidth, triggerHeight);
         this.physics.add.existing(this._bossTriggerZone, true);
+
+        // DEBUG: Visual indicator for trigger zone (red rectangle)
+        this._bossTriggerDebug = this.add.rectangle(bx, by, triggerWidth, triggerHeight, 0xff0000, 0.2)
+            .setDepth(5);
 
         // Add "boss ahead" warning text
         this._bossWarning = this.add.text(bx, by - 60, '⚠ DANGER AHEAD', {

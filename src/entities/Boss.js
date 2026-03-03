@@ -93,6 +93,14 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         this.target = target;
     }
 
+    /**
+     * Bosses don't deal contact damage through the standard system.
+     * They handle their own damage via attack patterns.
+     */
+    canDealContactDamage() {
+        return false;
+    }
+
     // ── Phase Management ─────────────────────────────────────────────────────
 
     _initPhaseTimers() {
@@ -109,7 +117,9 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
             this._initPhaseTimers();
 
             // Phase transition flash
-            this.scene.cameras.main.flash(300, 255, 100, 100);
+            if (this.scene) {
+                this.scene.cameras.main.flash(300, 255, 100, 100);
+            }
 
             // Emit event for UI/audio
             EventBus.emit('BOSS_PHASE_CHANGE', {
@@ -139,9 +149,13 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
 
         // White flash
         this.setTintFill(0xffffff);
-        this.scene.time.delayedCall(80, () => {
-            if (this.active) this.clearTint();
-        });
+        const scene = this.scene;
+        const boss = this;
+        if (scene) {
+            scene.time.delayedCall(80, () => {
+                if (boss.active) boss.clearTint();
+            });
+        }
 
         if (this.hp <= 0) {
             this.hp = 0;
@@ -156,8 +170,10 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     die() {
         this.alive = false;
         this.state = ENTITY_STATES.DEAD;
-        this.body.setVelocity(0, 0);
-        this.body.enable = false;
+        if (this.body) {
+            this.body.setVelocity(0, 0);
+            this.body.enable = false;
+        }
 
         // Cleanup graphics
         if (this._telegraphGfx?.active) this._telegraphGfx.destroy();
@@ -172,22 +188,27 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         // Subclass death effect
         this._deathEffect();
 
-        // Dramatic death animation
-        this.scene.cameras.main.flash(500, 255, 255, 255);
-        this.scene.tweens.add({
-            targets: this,
-            alpha: 0, scaleX: 2, scaleY: 2,
-            duration: 800,
-            ease: 'Power2',
-            onComplete: () => this.destroy()
-        });
+        // Dramatic death animation (capture scene reference)
+        const scene = this.scene;
+        if (scene) {
+            scene.cameras.main.flash(500, 255, 255, 255);
+            scene.tweens.add({
+                targets: this,
+                alpha: 0, scaleX: 2, scaleY: 2,
+                duration: 800,
+                ease: 'Power2',
+                onComplete: () => this.destroy()
+            });
+        } else {
+            this.destroy();
+        }
     }
 
     // ── AI Update ───────────────────────────────────────────────────────────
 
     preUpdate(time, delta) {
         super.preUpdate(time, delta);
-        if (!this.alive || !this.target) return;
+        if (!this.alive || !this.target || !this.scene) return;
 
         const phase = this.phases[this.currentPhase];
 
@@ -273,40 +294,43 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     // ── Individual Attack Implementations ────────────────────────────────
 
     _attackSlam(atk) {
-        if (!this.target) return;
-        const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+        if (!this.target || !this.scene) return;
+        const scene = this.scene; // Capture scene reference
+        const boss = this;
+        const target = this.target;
+        const angle = Math.atan2(target.y - this.y, target.x - this.x);
         const range = atk.range || 64;
         const arcRad = Phaser.Math.DegToRad(atk.arc || 120);
         const halfArc = arcRad / 2;
 
         // Telegraph
         const telegraphTime = atk.telegraph || 500;
-        const tGfx = this.scene.add.graphics().setDepth(7);
+        const tGfx = scene.add.graphics().setDepth(7);
         tGfx.fillStyle(0xff4444, 0.15);
         tGfx.slice(this.x, this.y, range, angle - halfArc, angle + halfArc, false);
         tGfx.fillPath();
 
-        this.scene.time.delayedCall(telegraphTime, () => {
-            if (!this.alive) { tGfx.destroy(); return; }
+        scene.time.delayedCall(telegraphTime, () => {
+            if (!boss.alive) { tGfx.destroy(); return; }
             tGfx.destroy();
 
             // Actual slam
-            const gfx = this.scene.add.graphics().setDepth(7);
+            const gfx = scene.add.graphics().setDepth(7);
             gfx.fillStyle(0xff6644, 0.4);
-            gfx.slice(this.x, this.y, range, angle - halfArc, angle + halfArc, false);
+            gfx.slice(boss.x, boss.y, range, angle - halfArc, angle + halfArc, false);
             gfx.fillPath();
-            this.scene.tweens.add({ targets: gfx, alpha: 0, duration: 200, onComplete: () => gfx.destroy() });
+            scene.tweens.add({ targets: gfx, alpha: 0, duration: 200, onComplete: () => gfx.destroy() });
 
             // Damage player if in arc
-            const d = distance(this.x, this.y, this.target.x, this.target.y);
+            const d = distance(boss.x, boss.y, target.x, target.y);
             if (d <= range) {
-                const aToP = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+                const aToP = Math.atan2(target.y - boss.y, target.x - boss.x);
                 const diff = Math.abs(Phaser.Math.Angle.Wrap(aToP - angle));
                 if (diff <= halfArc) {
-                    if (!this.target.isInvincible) {
-                        this.target.takeDamage(atk.damage);
+                    if (!target.isInvincible) {
+                        target.takeDamage(atk.damage);
                         EventBus.emit(Events.PLAYER_HEALTH_CHANGED, {
-                            hp: this.target.hp, maxHp: this.target.maxHp
+                            hp: target.hp, maxHp: target.maxHp
                         });
                     }
                 }
@@ -315,11 +339,13 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     }
 
     _attackProjectile(atk) {
-        if (!this.target) return;
-        const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+        if (!this.target || !this.scene) return;
+        const scene = this.scene; // Capture scene reference before it becomes undefined
+        const target = this.target;
+        const angle = Math.atan2(target.y - this.y, target.x - this.x);
         const speed = atk.speed || 180;
 
-        const proj = this.scene.add.graphics().setDepth(8);
+        const proj = scene.add.graphics().setDepth(8);
         proj.fillStyle(this.bossData.color, 0.9);
         proj.fillCircle(0, 0, 5);
         proj.setPosition(this.x, this.y);
@@ -335,27 +361,30 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
             proj.y += vy * (delta / 1000);
 
             // Hit player
-            if (this.target?.alive && !this.target.isInvincible) {
-                if (distance(proj.x, proj.y, this.target.x, this.target.y) < 16) {
-                    this.target.takeDamage(atk.damage);
+            if (target?.alive && !target.isInvincible) {
+                if (distance(proj.x, proj.y, target.x, target.y) < 16) {
+                    target.takeDamage(atk.damage);
                     EventBus.emit(Events.PLAYER_HEALTH_CHANGED, {
-                        hp: this.target.hp, maxHp: this.target.maxHp
+                        hp: target.hp, maxHp: target.maxHp
                     });
-                    this.scene.events.off('update', update);
+                    scene.events.off('update', update);
                     proj.destroy();
                     return;
                 }
             }
 
             if (lifetime > 4000) {
-                this.scene.events.off('update', update);
+                scene.events.off('update', update);
                 proj.destroy();
             }
         };
-        this.scene.events.on('update', update);
+        scene.events.on('update', update);
     }
 
     _attackBarrage(atk) {
+        if (!this.scene) return;
+        const scene = this.scene; // Capture scene reference
+        const boss = this;
         const count = atk.count || 5;
         const spread = Phaser.Math.DegToRad(atk.spread || 40);
         const baseAngle = this.target
@@ -364,14 +393,16 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
 
         for (let i = 0; i < count; i++) {
             const angle = baseAngle - spread / 2 + (spread / (count - 1 || 1)) * i;
-            this.scene.time.delayedCall(i * 80, () => {
-                if (!this.alive) return;
-                this._attackProjectile({ ...atk, speed: atk.speed || 180 });
+            scene.time.delayedCall(i * 80, () => {
+                if (!boss.alive) return;
+                boss._attackProjectile({ ...atk, speed: atk.speed || 180 });
             });
         }
     }
 
     _attackSummon(atk) {
+        if (!this.scene) return;
+        const scene = this.scene; // Capture scene reference
         const count = atk.count || 1;
         const enemyType = atk.enemy || 'swarmer';
 
@@ -381,66 +412,70 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
             const sy = this.y + Math.sin(angle) * 48;
 
             // Spawn effect
-            const gfx = this.scene.add.graphics().setDepth(7);
+            const gfx = scene.add.graphics().setDepth(7);
             gfx.fillStyle(this.bossData.color, 0.3);
             gfx.fillCircle(sx, sy, 12);
-            this.scene.tweens.add({
+            scene.tweens.add({
                 targets: gfx, alpha: 0, scale: 2, duration: 300,
                 onComplete: () => gfx.destroy()
             });
 
             // Spawn enemy via the scene's spawner logic
-            if (this.scene.spawnEnemyAt) {
-                this.scene.spawnEnemyAt(sx, sy, enemyType);
+            if (scene.spawnEnemyAt) {
+                scene.spawnEnemyAt(sx, sy, enemyType);
             }
         }
     }
 
     _attackHoming(atk) {
-        if (!this.target) return;
+        if (!this.target || !this.scene) return;
+        const scene = this.scene; // Capture scene reference
+        const target = this.target;
         const speed = atk.speed || 130;
         const maxLife = atk.duration || 3000;
 
-        const proj = this.scene.add.graphics().setDepth(8);
+        const proj = scene.add.graphics().setDepth(8);
         proj.fillStyle(0xff8844, 0.8);
         proj.fillCircle(0, 0, 4);
         proj.setPosition(this.x, this.y);
 
         let lifetime = 0;
         const update = (time, delta) => {
-            if (!proj.active || !this.target?.alive) {
-                this.scene.events.off('update', update);
+            if (!proj.active || !target?.alive) {
+                scene.events.off('update', update);
                 if (proj.active) proj.destroy();
                 return;
             }
             lifetime += delta;
 
-            const dx = this.target.x - proj.x;
-            const dy = this.target.y - proj.y;
+            const dx = target.x - proj.x;
+            const dy = target.y - proj.y;
             const dist = Math.sqrt(dx * dx + dy * dy) || 1;
             proj.x += (dx / dist) * speed * (delta / 1000);
             proj.y += (dy / dist) * speed * (delta / 1000);
 
-            if (dist < 16 && !this.target.isInvincible) {
-                this.target.takeDamage(atk.damage);
+            if (dist < 16 && !target.isInvincible) {
+                target.takeDamage(atk.damage);
                 EventBus.emit(Events.PLAYER_HEALTH_CHANGED, {
-                    hp: this.target.hp, maxHp: this.target.maxHp
+                    hp: target.hp, maxHp: target.maxHp
                 });
-                this.scene.events.off('update', update);
+                scene.events.off('update', update);
                 proj.destroy();
                 return;
             }
 
             if (lifetime > maxLife) {
-                this.scene.events.off('update', update);
+                scene.events.off('update', update);
                 proj.destroy();
             }
         };
-        this.scene.events.on('update', update);
+        scene.events.on('update', update);
     }
 
     _attackCharge(atk) {
-        if (!this.target) return;
+        if (!this.target || !this.scene) return;
+        const scene = this.scene; // Capture scene reference
+        const boss = this;
         const telegraph = atk.telegraph || 1000;
         const chargeSpeed = atk.speed || 200;
 
@@ -448,44 +483,50 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         this.setTint(0xff2222);
 
         // Line telegraph toward player
-        const tGfx = this.scene.add.graphics().setDepth(7);
+        const tGfx = scene.add.graphics().setDepth(7);
         const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
         tGfx.lineStyle(6, 0xff4444, 0.2);
         tGfx.lineBetween(this.x, this.y,
             this.x + Math.cos(angle) * 200,
             this.y + Math.sin(angle) * 200);
 
-        this.scene.time.delayedCall(telegraph, () => {
-            if (!this.alive) { tGfx.destroy(); return; }
+        scene.time.delayedCall(telegraph, () => {
+            if (!boss.alive) { tGfx.destroy(); return; }
             tGfx.destroy();
-            this.clearTint();
+            boss.clearTint();
 
             // Charge!
-            this.body.setVelocity(
-                Math.cos(angle) * chargeSpeed,
-                Math.sin(angle) * chargeSpeed
-            );
+            if (boss.body) {
+                boss.body.setVelocity(
+                    Math.cos(angle) * chargeSpeed,
+                    Math.sin(angle) * chargeSpeed
+                );
+            }
 
             // Stop after ~0.5s
-            this.scene.time.delayedCall(500, () => {
-                if (this.alive) this.body.setVelocity(0, 0);
+            scene.time.delayedCall(500, () => {
+                if (boss.alive && boss.body) boss.body.setVelocity(0, 0);
             });
         });
     }
 
     _attackBeam(atk) {
+        if (!this.scene) return;
+        const scene = this.scene; // Capture scene reference
+        const boss = this;
+        const target = this.target;
         const duration = atk.duration || 2000;
         const rotSpeed = atk.rotationSpeed || 0.8;
-        let angle = this.target
-            ? Math.atan2(this.target.y - this.y, this.target.x - this.x)
+        let angle = target
+            ? Math.atan2(target.y - this.y, target.x - this.x)
             : 0;
         let elapsed = 0;
 
-        const beamGfx = this.scene.add.graphics().setDepth(7);
+        const beamGfx = scene.add.graphics().setDepth(7);
 
         const update = (time, delta) => {
-            if (!this.alive) {
-                this.scene.events.off('update', update);
+            if (!boss.alive) {
+                scene.events.off('update', update);
                 beamGfx.destroy();
                 return;
             }
@@ -494,57 +535,65 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
 
             beamGfx.clear();
             beamGfx.lineStyle(6, 0xaa44ff, 0.6);
-            beamGfx.lineBetween(this.x, this.y,
-                this.x + Math.cos(angle) * 300,
-                this.y + Math.sin(angle) * 300);
+            beamGfx.lineBetween(boss.x, boss.y,
+                boss.x + Math.cos(angle) * 300,
+                boss.y + Math.sin(angle) * 300);
 
             // Damage check along beam
-            if (this.target?.alive && !this.target.isInvincible) {
-                const px = this.target.x - this.x;
-                const py = this.target.y - this.y;
+            if (target?.alive && !target.isInvincible) {
+                const px = target.x - boss.x;
+                const py = target.y - boss.y;
                 const dot = px * Math.cos(angle) + py * Math.sin(angle);
                 const cross = Math.abs(px * Math.sin(angle) - py * Math.cos(angle));
                 if (dot > 0 && cross < 14) {
-                    this.target.takeDamage(Math.round(atk.damage * (delta / 1000)));
+                    target.takeDamage(Math.round(atk.damage * (delta / 1000)));
                 }
             }
 
             if (elapsed >= duration) {
-                this.scene.events.off('update', update);
+                scene.events.off('update', update);
                 beamGfx.destroy();
             }
         };
-        this.scene.events.on('update', update);
+        scene.events.on('update', update);
     }
 
     _attackSpin(atk) {
+        if (!this.scene) return;
+        const scene = this.scene; // Capture scene reference
+        const boss = this;
+        const target = this.target;
         const duration = atk.duration || 1500;
         let elapsed = 0;
 
-        const gfx = this.scene.add.graphics().setDepth(7);
+        const gfx = scene.add.graphics().setDepth(7);
 
         const update = (time, delta) => {
             elapsed += delta;
             gfx.clear();
             gfx.fillStyle(0x8888aa, 0.3);
-            gfx.fillCircle(this.x, this.y, atk.radius || 56);
+            gfx.fillCircle(boss.x, boss.y, atk.radius || 56);
 
-            if (this.target?.alive && !this.target.isInvincible) {
-                const d = distance(this.x, this.y, this.target.x, this.target.y);
+            if (target?.alive && !target.isInvincible) {
+                const d = distance(boss.x, boss.y, target.x, target.y);
                 if (d < (atk.radius || 56)) {
-                    this.target.takeDamage(Math.round(atk.damage * (delta / 1000)));
+                    target.takeDamage(Math.round(atk.damage * (delta / 1000)));
                 }
             }
 
-            if (elapsed >= duration || !this.alive) {
-                this.scene.events.off('update', update);
+            if (elapsed >= duration || !boss.alive) {
+                scene.events.off('update', update);
                 gfx.destroy();
             }
         };
-        this.scene.events.on('update', update);
+        scene.events.on('update', update);
     }
 
     _attackAoeZone(atk) {
+        if (!this.scene) return;
+        const scene = this.scene; // Capture scene reference
+        const boss = this;
+        const target = this.target;
         const count = atk.count || 3;
         const radius = atk.radius || 80;
         const duration = atk.duration || 3000;
@@ -553,10 +602,10 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
             // Random position near player
             const ox = (Math.random() - 0.5) * 200;
             const oy = (Math.random() - 0.5) * 200;
-            const zx = (this.target?.x || this.x) + ox;
-            const zy = (this.target?.y || this.y) + oy;
+            const zx = (target?.x || boss.x) + ox;
+            const zy = (target?.y || boss.y) + oy;
 
-            const zone = this.scene.add.graphics().setDepth(6);
+            const zone = scene.add.graphics().setDepth(6);
             zone.fillStyle(0x44aa22, 0.15);
             zone.fillCircle(zx, zy, radius);
 
@@ -570,49 +619,55 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
 
                 if (tickTimer >= tickInterval) {
                     tickTimer = 0;
-                    if (this.target?.alive && !this.target.isInvincible) {
-                        const d = distance(zx, zy, this.target.x, this.target.y);
+                    if (target?.alive && !target.isInvincible) {
+                        const d = distance(zx, zy, target.x, target.y);
                         if (d < radius) {
-                            this.target.takeDamage(atk.damage);
+                            target.takeDamage(atk.damage);
                         }
                     }
                 }
 
-                if (elapsed >= duration || !this.alive) {
-                    this.scene.events.off('update', update);
+                if (elapsed >= duration || !boss.alive) {
+                    scene.events.off('update', update);
                     zone.destroy();
                 }
             };
-            this.scene.events.on('update', update);
+            scene.events.on('update', update);
         }
     }
 
     _attackPulse(atk) {
+        if (!this.scene) return;
+        const scene = this.scene; // Capture scene reference
+        const target = this.target;
         const radius = atk.radius || 200;
 
-        const gfx = this.scene.add.graphics().setDepth(7);
+        const gfx = scene.add.graphics().setDepth(7);
         gfx.fillStyle(0x66aa44, 0.3);
         gfx.fillCircle(this.x, this.y, radius);
 
-        this.scene.tweens.add({
+        scene.tweens.add({
             targets: gfx, alpha: 0, scale: 1.5, duration: 400,
             onComplete: () => gfx.destroy()
         });
 
-        if (this.target?.alive && !this.target.isInvincible) {
-            const d = distance(this.x, this.y, this.target.x, this.target.y);
+        if (target?.alive && !target.isInvincible) {
+            const d = distance(this.x, this.y, target.x, target.y);
             if (d < radius) {
-                this.target.takeDamage(atk.damage);
+                target.takeDamage(atk.damage);
             }
         }
     }
 
     _attackCombo(atk) {
+        if (!this.scene) return;
+        const scene = this.scene; // Capture scene reference
+        const boss = this;
         const hits = atk.hits || 3;
         for (let i = 0; i < hits; i++) {
-            this.scene.time.delayedCall(i * 300, () => {
-                if (!this.alive) return;
-                this._attackSlam({
+            scene.time.delayedCall(i * 300, () => {
+                if (!boss.alive) return;
+                boss._attackSlam({
                     damage: atk.damage,
                     range: atk.range || 56,
                     arc: atk.arc || 90,
@@ -623,18 +678,22 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     }
 
     _attackConeBreath(atk) {
+        if (!this.scene) return;
+        const scene = this.scene; // Capture scene reference
+        const boss = this;
+        const target = this.target;
         const range = atk.range || 120;
         const arcDeg = atk.arc || 60;
         const duration = atk.duration || 1500;
-        const angle = this.target
-            ? Math.atan2(this.target.y - this.y, this.target.x - this.x)
+        const angle = target
+            ? Math.atan2(target.y - boss.y, target.x - boss.x)
             : 0;
 
         let elapsed = 0;
         const tickInterval = 200;
         let tickTimer = 0;
 
-        const gfx = this.scene.add.graphics().setDepth(7);
+        const gfx = scene.add.graphics().setDepth(7);
 
         const update = (time, delta) => {
             elapsed += delta;
@@ -643,52 +702,53 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
             gfx.clear();
             const halfArc = Phaser.Math.DegToRad(arcDeg) / 2;
             gfx.fillStyle(0xff4422, 0.2);
-            gfx.slice(this.x, this.y, range, angle - halfArc, angle + halfArc, false);
+            gfx.slice(boss.x, boss.y, range, angle - halfArc, angle + halfArc, false);
             gfx.fillPath();
 
             if (tickTimer >= tickInterval) {
                 tickTimer = 0;
-                if (this.target?.alive && !this.target.isInvincible) {
-                    const d = distance(this.x, this.y, this.target.x, this.target.y);
+                if (target?.alive && !target.isInvincible) {
+                    const d = distance(boss.x, boss.y, target.x, target.y);
                     if (d <= range) {
-                        const aToP = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+                        const aToP = Math.atan2(target.y - boss.y, target.x - boss.x);
                         const diff = Math.abs(Phaser.Math.Angle.Wrap(aToP - angle));
                         if (diff <= halfArc) {
-                            this.target.takeDamage(atk.damage);
+                            target.takeDamage(atk.damage);
                         }
                     }
                 }
             }
 
-            if (elapsed >= duration || !this.alive) {
-                this.scene.events.off('update', update);
+            if (elapsed >= duration || !boss.alive) {
+                scene.events.off('update', update);
                 gfx.destroy();
             }
         };
-        this.scene.events.on('update', update);
+        scene.events.on('update', update);
     }
 
     _attackTeleportSlash(atk) {
-        if (!this.target) return;
+        if (!this.target || !this.scene) return;
+        const scene = this.scene; // Capture scene reference
+        const boss = this;
+        const target = this.target;
 
         // Flash out
-        const startX = this.x;
-        const startY = this.y;
         this.setAlpha(0.3);
 
-        this.scene.time.delayedCall(300, () => {
-            if (!this.alive) return;
+        scene.time.delayedCall(300, () => {
+            if (!boss.alive) return;
 
             // Appear behind player
-            const angle = Math.atan2(this.y - this.target.y, this.x - this.target.x);
-            const behindX = this.target.x + Math.cos(angle) * 40;
-            const behindY = this.target.y + Math.sin(angle) * 40;
+            const angle = Math.atan2(boss.y - target.y, boss.x - target.x);
+            const behindX = target.x + Math.cos(angle) * 40;
+            const behindY = target.y + Math.sin(angle) * 40;
 
-            this.setPosition(behindX, behindY);
-            this.setAlpha(1);
+            boss.setPosition(behindX, behindY);
+            boss.setAlpha(1);
 
             // Slash
-            this._attackSlam({
+            boss._attackSlam({
                 damage: atk.damage,
                 range: 56,
                 arc: 120,
@@ -698,15 +758,18 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     }
 
     _attackGravityWell(atk) {
-        if (!this.target) return;
-        const wx = this.target.x + (Math.random() - 0.5) * 80;
-        const wy = this.target.y + (Math.random() - 0.5) * 80;
+        if (!this.target || !this.scene) return;
+        const scene = this.scene; // Capture scene reference
+        const boss = this;
+        const target = this.target;
+        const wx = target.x + (Math.random() - 0.5) * 80;
+        const wy = target.y + (Math.random() - 0.5) * 80;
         const radius = atk.radius || 100;
         const pullForce = atk.pullForce || 80;
         const duration = atk.duration || 3000;
         let elapsed = 0;
 
-        const gfx = this.scene.add.graphics().setDepth(6);
+        const gfx = scene.add.graphics().setDepth(6);
 
         const update = (time, delta) => {
             elapsed += delta;
@@ -717,28 +780,28 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
             gfx.fillCircle(wx, wy, radius);
 
             // Pull player toward center
-            if (this.target?.alive) {
-                const d = distance(wx, wy, this.target.x, this.target.y);
+            if (target?.alive) {
+                const d = distance(wx, wy, target.x, target.y);
                 if (d < radius && d > 5) {
-                    const dx = wx - this.target.x;
-                    const dy = wy - this.target.y;
+                    const dx = wx - target.x;
+                    const dy = wy - target.y;
                     const len = Math.sqrt(dx * dx + dy * dy) || 1;
-                    this.target.x += (dx / len) * pullForce * (delta / 1000);
-                    this.target.y += (dy / len) * pullForce * (delta / 1000);
+                    target.x += (dx / len) * pullForce * (delta / 1000);
+                    target.y += (dy / len) * pullForce * (delta / 1000);
                 }
 
                 // Tick damage at center
-                if (d < 20 && !this.target.isInvincible) {
-                    this.target.takeDamage(Math.round(atk.damage * (delta / 1000)));
+                if (d < 20 && !target.isInvincible) {
+                    target.takeDamage(Math.round(atk.damage * (delta / 1000)));
                 }
             }
 
-            if (elapsed >= duration || !this.alive) {
-                this.scene.events.off('update', update);
+            if (elapsed >= duration || !boss.alive) {
+                scene.events.off('update', update);
                 gfx.destroy();
             }
         };
-        this.scene.events.on('update', update);
+        scene.events.on('update', update);
     }
 
     /**

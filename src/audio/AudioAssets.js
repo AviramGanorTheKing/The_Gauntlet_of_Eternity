@@ -13,27 +13,46 @@ const BASE_SFX_RPG = 'assets/audio/sfx/RPG Sound Pack';
 /**
  * Music tracks to preload.
  * Uses single-track approach (no layered stems) for simplicity.
+ *
+ * Track mapping:
+ * - Title Theme: menus, character select
+ * - Main Theme: fallback gameplay
+ * - Dungeon Crawler: Crypt biome
+ * - Cave: Fungal Caves biome
+ * - Explore The Unknown: Iron Fortress biome
+ * - Expedition: Inferno biome
+ * - The Mysterious Dungeon: Abyss biome
+ * - Boss Battle: regular bosses
+ * - Final Boss: Void Architect (floor 25)
+ * - Take Some Rest: shops
+ * - Victory!: boss defeat
+ * - Game Over: death screen
+ * - The End: victory/endings
  */
 export const MUSIC_ASSETS = {
     // Menu / UI
-    music_title: `${BASE_MUSIC}/bgm_menu.mp3`,
-    music_shop: `${BASE_MUSIC}/bgm_menu.mp3`,
-    music_death_jingle: `${BASE_MUSIC}/bgm_action_5.mp3`,
-    music_victory_fanfare: `${BASE_MUSIC}/bgm_action_3.mp3`,
+    music_title: `${BASE_MUSIC}/01 - Title Theme.mp3`,
+    music_shop: `${BASE_MUSIC}/04 - Take Some Rest.mp3`,
+    music_death_jingle: `${BASE_MUSIC}/12 - Game Over.mp3`,
+    music_victory_fanfare: `${BASE_MUSIC}/08 - Victory!.mp3`,
+    music_ending: `${BASE_MUSIC}/14 - The End.mp3`,
 
-    // Biome music (single track per biome - no layered stems)
-    music_crypt: `${BASE_MUSIC}/bgm_action_1.mp3`,
-    music_caves: `${BASE_MUSIC}/bgm_action_2.mp3`,
-    music_fortress: `${BASE_MUSIC}/bgm_action_3.mp3`,
-    music_inferno: `${BASE_MUSIC}/bgm_action_4.mp3`,
-    music_abyss: `${BASE_MUSIC}/bgm_action_5.mp3`,
+    // Biome music (using Main Theme for all gameplay)
+    music_crypt: `${BASE_MUSIC}/15 - Main Theme.mp3`,
+    music_caves: `${BASE_MUSIC}/15 - Main Theme.mp3`,
+    music_fortress: `${BASE_MUSIC}/15 - Main Theme.mp3`,
+    music_inferno: `${BASE_MUSIC}/15 - Main Theme.mp3`,
+    music_abyss: `${BASE_MUSIC}/15 - Main Theme.mp3`,
 
-    // Boss music (reuse action tracks)
-    music_boss_bone_sovereign: `${BASE_MUSIC}/bgm_action_5.mp3`,
-    music_boss_sporemind: `${BASE_MUSIC}/bgm_action_4.mp3`,
-    music_boss_iron_warden: `${BASE_MUSIC}/bgm_action_3.mp3`,
-    music_boss_ember_tyrant: `${BASE_MUSIC}/bgm_action_4.mp3`,
-    music_boss_void_architect: `${BASE_MUSIC}/bgm_action_5.mp3`,
+    // Boss music
+    music_boss_bone_sovereign: `${BASE_MUSIC}/19 - Boss Battle.mp3`,
+    music_boss_sporemind: `${BASE_MUSIC}/19 - Boss Battle.mp3`,
+    music_boss_iron_warden: `${BASE_MUSIC}/19 - Boss Battle.mp3`,
+    music_boss_ember_tyrant: `${BASE_MUSIC}/19 - Boss Battle.mp3`,
+    music_boss_void_architect: `${BASE_MUSIC}/13 - Final Boss.mp3`,
+
+    // Fallback/alternative
+    music_main: `${BASE_MUSIC}/15 - Main Theme.mp3`,
 };
 
 /**

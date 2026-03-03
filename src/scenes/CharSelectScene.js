@@ -39,6 +39,9 @@ export class CharSelectScene extends Phaser.Scene {
         const W = this.game.config.width;
         const H = this.game.config.height;
 
+        // Play title music if not already playing
+        this._ensureTitleMusic();
+
         // Apply CRT shader
         this.crtPipeline = applyCRTShader(this, 'subtle');
 
@@ -406,6 +409,9 @@ export class CharSelectScene extends Phaser.Scene {
             });
         }
 
+        // Stop title music
+        this._stopTitleMusic();
+
         // Fade to black
         this.cameras.main.fadeOut(600, 0, 0, 0);
         this.cameras.main.once('camerafadeoutcomplete', () => {
@@ -414,5 +420,35 @@ export class CharSelectScene extends Phaser.Scene {
                 companions: this.selectedCompanions
             });
         });
+    }
+
+    _ensureTitleMusic() {
+        // Check if title music is already playing
+        const playing = this.sound.sounds.find(s =>
+            s.key === 'music_title' && s.isPlaying
+        );
+        if (playing) return;
+
+        // Start title music
+        this.sound.stopAll();
+        if (this.cache.audio.exists('music_title')) {
+            this._titleMusic = this.sound.add('music_title', {
+                loop: true,
+                volume: 0.6
+            });
+            this._titleMusic.play();
+        }
+    }
+
+    _stopTitleMusic() {
+        // Stop all title music immediately - don't rely on tweens that may not complete
+        // when the scene is destroyed during transition
+        const allTitleMusic = this.sound.sounds.filter(s =>
+            s.key === 'music_title' && s.isPlaying
+        );
+        for (const track of allTitleMusic) {
+            track.stop();
+        }
+        this._titleMusic = null;
     }
 }

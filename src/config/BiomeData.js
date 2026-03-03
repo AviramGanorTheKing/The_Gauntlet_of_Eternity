@@ -7,12 +7,12 @@ export const BiomeData = {
         name: 'The Crypt',
         floors: [1, 5],
         roomCount: [8, 12],       // min, max rooms per floor
-        gridWidth: 60,            // dungeon grid width in tiles
-        gridHeight: 45,           // dungeon grid height in tiles
-        minRoomSize: 6,           // minimum room dimension (tiles)
-        maxRoomSize: 12,          // maximum room dimension (tiles)
+        gridWidth: 65,            // dungeon grid width in tiles (increased for better room generation)
+        gridHeight: 50,           // dungeon grid height in tiles (increased for better room generation)
+        minRoomSize: 7,           // minimum room dimension (tiles) - increased to ensure proper rooms
+        maxRoomSize: 14,          // maximum room dimension (tiles) - increased for better variety
         corridorWidth: 2,         // corridor width in tiles
-        bspMinLeafSize: 10,       // minimum BSP leaf size
+        bspMinLeafSize: 12,       // minimum BSP leaf size - increased to prevent tiny leaves
 
         // Floor scaling: later floors in biome are larger
         floorScaling: {

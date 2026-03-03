@@ -102,13 +102,70 @@ export class BootScene extends Phaser.Scene {
 
         // Audio is preloaded in preload() via preloadAllAudio()
 
-        // Route: IntroScene on first boot, MenuScene on subsequent
-        const introSeen = localStorage.getItem('gauntlet_intro_seen');
-        if (!introSeen) {
-            this.scene.start('IntroScene');
-        } else {
-            this.scene.start('MenuScene');
+        // Show "click to continue" prompt and wait for user interaction
+        this._showClickToContinue();
+    }
+
+    _showClickToContinue() {
+        const width = this.game.config.width;
+        const height = this.game.config.height;
+
+        // Update loading text to show completion
+        if (this._loadingText) {
+            this._loadingText.setText('LOADING COMPLETE!');
         }
+
+        // Create "click to continue" text with pulsing animation
+        const clickText = this.add.text(width / 2, height / 2 + 50, 'CLICK ANYWHERE TO START', {
+            fontFamily: 'monospace',
+            fontSize: '14px',
+            color: '#ffdd44'
+        }).setOrigin(0.5).setAlpha(0);
+
+        // Fade in the text
+        this.tweens.add({
+            targets: clickText,
+            alpha: 1,
+            duration: 300,
+            onComplete: () => {
+                // Pulse animation
+                this.tweens.add({
+                    targets: clickText,
+                    alpha: 0.5,
+                    duration: 600,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+            }
+        });
+
+        // Wait for any input (click, tap, or key)
+        const proceed = () => {
+            // Resume audio context (required for browser autoplay policy)
+            if (this.sound.context && this.sound.context.state === 'suspended') {
+                this.sound.context.resume();
+            }
+
+            // Remove listeners
+            this.input.off('pointerdown', proceed);
+            this.input.keyboard.off('keydown', proceed);
+
+            // Fade out and transition
+            this.cameras.main.fadeOut(300, 0, 0, 0);
+            this.cameras.main.once('camerafadeoutcomplete', () => {
+                // Route: IntroScene on first boot, MenuScene on subsequent
+                const introSeen = localStorage.getItem('gauntlet_intro_seen');
+                if (!introSeen) {
+                    this.scene.start('IntroScene');
+                } else {
+                    this.scene.start('MenuScene');
+                }
+            });
+        };
+
+        this.input.on('pointerdown', proceed);
+        this.input.keyboard.on('keydown', proceed);
     }
 
     createLoadingBar() {
@@ -120,19 +177,37 @@ export class BootScene extends Phaser.Scene {
         // Background
         this.add.rectangle(width / 2, height / 2, barWidth + 4, barHeight + 4, 0x222222);
 
-        // Progress bar (static for now since we generate textures)
-        const progressBar = this.add.rectangle(
-            width / 2, height / 2,
-            barWidth, barHeight,
+        // Progress bar background (empty)
+        this.add.rectangle(width / 2, height / 2, barWidth, barHeight, 0x111111).setOrigin(0.5);
+
+        // Progress bar fill (starts empty, grows with progress)
+        this._progressBar = this.add.rectangle(
+            width / 2 - barWidth / 2, height / 2,
+            0, barHeight,
             0x44ff44
-        ).setOrigin(0.5);
+        ).setOrigin(0, 0.5);
 
         // Loading text
-        this.add.text(width / 2, height / 2 - 40, 'LOADING...', {
+        this._loadingText = this.add.text(width / 2, height / 2 - 40, 'LOADING... 0%', {
             fontFamily: 'monospace',
             fontSize: '16px',
             color: '#ffffff'
         }).setOrigin(0.5);
+
+        // Store bar width for progress calculation
+        this._barWidth = barWidth;
+
+        // Listen to load progress events
+        this.load.on('progress', (value) => {
+            const percent = Math.round(value * 100);
+            this._progressBar.width = barWidth * value;
+            this._loadingText.setText(`LOADING... ${percent}%`);
+        });
+
+        this.load.on('complete', () => {
+            this._loadingText.setText('LOADING... 100%');
+            this._progressBar.width = barWidth;
+        });
     }
 
     registerCRTShader() {

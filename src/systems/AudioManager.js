@@ -45,6 +45,7 @@ const STANDALONE_KEYS = {
     shop:    'music_shop',
     death:   'music_death_jingle',
     victory: 'music_victory_fanfare',
+    ending:  'music_ending',
 };
 
 /** Fade durations (ms) */
@@ -137,6 +138,7 @@ export class AudioManager {
         this._stopBiomeTrack();
         this._stopBossTheme();
         this._stopStandalone();
+        this._stopAllTitleMusic();  // Stop any lingering title music from menu scenes
 
         this.currentBiome = biomeKey;
         this.state = 'exploring';
@@ -358,6 +360,23 @@ export class AudioManager {
             this.standaloneTrack.stop();
             this.standaloneTrack.destroy();
             this.standaloneTrack = null;
+        }
+    }
+
+    /**
+     * Stop any title music that may have been started by menu scenes.
+     * This catches music started directly via Phaser's sound manager
+     * rather than through AudioManager.
+     */
+    _stopAllTitleMusic() {
+        const titleMusic = this.sound.sounds?.filter(s =>
+            s.key === 'music_title' && s.isPlaying
+        );
+        if (titleMusic) {
+            for (const track of titleMusic) {
+                track.stop();
+                track.destroy();
+            }
         }
     }
 

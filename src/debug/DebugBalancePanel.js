@@ -41,7 +41,7 @@ export class DebugBalancePanel {
         // Tabs
         const tabs = document.createElement('div');
         tabs.style.cssText = 'display: flex; border-bottom: 1px solid #444;';
-        for (const tab of ['players', 'enemies', 'global']) {
+        for (const tab of ['players', 'enemies', 'global', 'dev']) {
             const btn = document.createElement('div');
             btn.textContent = tab.toUpperCase();
             btn.dataset.tab = tab;
@@ -88,6 +88,7 @@ export class DebugBalancePanel {
             case 'players': this._renderPlayersTab(); break;
             case 'enemies': this._renderEnemiesTab(); break;
             case 'global': this._renderGlobalTab(); break;
+            case 'dev': this._renderDevTab(); break;
         }
     }
 
@@ -236,6 +237,154 @@ export class DebugBalancePanel {
             this._updateReadback();
         });
         this.content.appendChild(pushBtn);
+    }
+
+    // ── Dev Tab ───────────────────────────────────────────────────────────
+
+    _renderDevTab() {
+        const db = window.GAUNTLET_DEBUG;
+        if (!db) { this.content.textContent = 'Debug bridge not ready'; return; }
+
+        // Section: Floor Teleport
+        const sectionTitle = document.createElement('div');
+        sectionTitle.textContent = '⚡ FLOOR TELEPORT';
+        sectionTitle.style.cssText = 'color: #ff8844; font-size: 13px; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 4px;';
+        this.content.appendChild(sectionTitle);
+
+        // Current floor display
+        const currentFloor = db.getCurrentFloor();
+        const floorDisplay = document.createElement('div');
+        floorDisplay.style.cssText = 'color: #aaa; font-size: 11px; margin-bottom: 8px;';
+        floorDisplay.innerHTML = `Current Floor: <span style="color: #ffdd00; font-weight: bold;">${currentFloor}</span>`;
+        this.content.appendChild(floorDisplay);
+
+        // Floor input
+        this.content.appendChild(this._label('Target Floor (1-25):'));
+        const floorInput = document.createElement('input');
+        floorInput.type = 'number';
+        floorInput.min = 1;
+        floorInput.max = 25;
+        floorInput.value = currentFloor;
+        floorInput.style.cssText = `
+            width: 100%; padding: 6px 8px; margin-bottom: 4px;
+            background: #1a1a2e; color: #ffdd00; border: 1px solid #444;
+            font-family: monospace; font-size: 14px; text-align: center;
+            border-radius: 3px;
+        `;
+        this.content.appendChild(floorInput);
+
+        // Quick floor buttons
+        const quickBtns = document.createElement('div');
+        quickBtns.style.cssText = 'display: flex; gap: 4px; margin: 8px 0; flex-wrap: wrap;';
+        const bossFloors = [5, 10, 15, 20, 25];
+        for (const floor of bossFloors) {
+            const btn = document.createElement('button');
+            btn.textContent = `F${floor}`;
+            btn.title = floor === 5 ? 'Bone Sovereign' : floor === 10 ? 'Sporemind' : floor === 15 ? 'Iron Warden' : floor === 20 ? 'Ember Tyrant' : 'Void Architect';
+            btn.style.cssText = `
+                flex: 1; padding: 6px 4px; min-width: 50px;
+                background: #2a1a1a; color: #ff6644; border: 1px solid #ff4444;
+                font-family: monospace; font-size: 11px; cursor: pointer;
+                border-radius: 3px;
+            `;
+            btn.onmouseenter = () => { btn.style.background = '#3a2a2a'; };
+            btn.onmouseleave = () => { btn.style.background = '#2a1a1a'; };
+            btn.onclick = () => { floorInput.value = floor; };
+            quickBtns.appendChild(btn);
+        }
+        this.content.appendChild(quickBtns);
+
+        const bossLabel = document.createElement('div');
+        bossLabel.textContent = '↑ Boss floors (click to set)';
+        bossLabel.style.cssText = 'color: #666; font-size: 9px; text-align: center; margin-bottom: 8px;';
+        this.content.appendChild(bossLabel);
+
+        // Teleport button
+        const teleportBtn = this._pushButton('⚡ TELEPORT', () => {
+            console.log('[DebugPanel] Teleport button clicked');
+            const target = parseInt(floorInput.value, 10);
+            if (isNaN(target) || target < 1 || target > 25) {
+                alert('Invalid floor number (1-25)');
+                return;
+            }
+            console.log('[DebugPanel] Teleporting to floor:', target);
+            const success = db.teleportToFloor(target);
+            console.log('[DebugPanel] Teleport result:', success);
+            if (success) {
+                this._flashButton(teleportBtn);
+                // Hide panel since scene is restarting
+                this.hide();
+            }
+        });
+        teleportBtn.style.background = '#1a2233';
+        teleportBtn.style.color = '#44aaff';
+        teleportBtn.style.borderColor = '#44aaff';
+        this.content.appendChild(teleportBtn);
+
+        this.content.appendChild(document.createElement('hr'));
+
+        // Section: Cheats
+        const cheatTitle = document.createElement('div');
+        cheatTitle.textContent = '🎮 CHEATS';
+        cheatTitle.style.cssText = 'color: #44ff44; font-size: 13px; font-weight: bold; margin: 10px 0; border-bottom: 1px solid #333; padding-bottom: 4px;';
+        this.content.appendChild(cheatTitle);
+
+        // God Mode toggle
+        const godModeRow = document.createElement('div');
+        godModeRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; margin: 8px 0;';
+        const godModeLabel = document.createElement('span');
+        godModeLabel.textContent = 'God Mode (Invincible)';
+        godModeLabel.style.cssText = 'color: #aaa; font-size: 11px;';
+        const godModeBtn = document.createElement('button');
+        godModeBtn.textContent = db.isGodMode() ? '[ON]' : '[OFF]';
+        godModeBtn.style.cssText = `
+            padding: 4px 12px; background: ${db.isGodMode() ? '#224422' : '#222'};
+            color: ${db.isGodMode() ? '#44ff44' : '#888'}; border: 1px solid #444;
+            font-family: monospace; cursor: pointer; border-radius: 3px;
+        `;
+        godModeBtn.onclick = () => {
+            const isOn = db.toggleGodMode();
+            godModeBtn.textContent = isOn ? '[ON]' : '[OFF]';
+            godModeBtn.style.background = isOn ? '#224422' : '#222';
+            godModeBtn.style.color = isOn ? '#44ff44' : '#888';
+        };
+        godModeRow.appendChild(godModeLabel);
+        godModeRow.appendChild(godModeBtn);
+        this.content.appendChild(godModeRow);
+
+        // Full Heal button
+        const healBtn = this._pushButton('💚 Full Heal + Mana', () => {
+            console.log('[DebugPanel] Full Heal button clicked');
+            db.fullHeal();
+            this._flashButton(healBtn);
+        });
+        healBtn.style.marginTop = '4px';
+        this.content.appendChild(healBtn);
+
+        // Give Gold
+        const goldRow = document.createElement('div');
+        goldRow.style.cssText = 'display: flex; gap: 8px; margin-top: 8px;';
+        const goldInput = document.createElement('input');
+        goldInput.type = 'number';
+        goldInput.value = 1000;
+        goldInput.style.cssText = `
+            flex: 1; padding: 4px 6px; background: #1a1a2e; color: #ffdd00;
+            border: 1px solid #444; font-family: monospace; border-radius: 3px;
+        `;
+        const goldBtn = document.createElement('button');
+        goldBtn.textContent = '💰 Give Gold';
+        goldBtn.style.cssText = `
+            padding: 4px 10px; background: #2a2a1a; color: #ffdd00;
+            border: 1px solid #ffaa00; font-family: monospace; cursor: pointer;
+            border-radius: 3px;
+        `;
+        goldBtn.onclick = () => {
+            db.giveGold(parseInt(goldInput.value, 10) || 0);
+            this._flashButton(goldBtn);
+        };
+        goldRow.appendChild(goldInput);
+        goldRow.appendChild(goldBtn);
+        this.content.appendChild(goldRow);
     }
 
     // ── Readback ───────────────────────────────────────────────────────────

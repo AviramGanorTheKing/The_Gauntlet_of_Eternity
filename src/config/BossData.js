@@ -244,10 +244,13 @@ export const BossData = {
  * @returns {object|null} boss config or null if no boss on this floor
  */
 export function getBossForFloor(floor) {
+    console.log('[BossData] getBossForFloor called with floor:', floor, 'type:', typeof floor);
     for (const [key, boss] of Object.entries(BossData)) {
         if (boss.bossFloor === floor) {
+            console.log('[BossData] Found boss:', key, 'for floor', floor);
             return { key, ...boss };
         }
     }
+    console.log('[BossData] No boss found for floor', floor);
     return null;
 }

@@ -51,4 +51,10 @@ export const Events = {
 
     // Secrets (Phase 4)
     SECRET_FOUND: 'secret:found',
+
+    // Player mana
+    PLAYER_MANA_CHANGED: 'player:manaChanged',
 };
+
+// Expose globally for debug tools
+window.GAUNTLET_EVENTS = { EventBus, Events };

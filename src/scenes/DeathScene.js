@@ -35,6 +35,16 @@ export class DeathScene extends Phaser.Scene {
         const W = this.game.config.width;
         const H = this.game.config.height;
 
+        // Stop any existing music and play death theme
+        this.sound.stopAll();
+        if (this.cache.audio.exists('music_death_jingle')) {
+            this._deathMusic = this.sound.add('music_death_jingle', {
+                loop: false,
+                volume: 0.7
+            });
+            this._deathMusic.play();
+        }
+
         // Apply CRT shader
         this.crtPipeline = applyCRTShader(this, 'arcade');
 

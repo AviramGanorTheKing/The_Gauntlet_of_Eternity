@@ -85,6 +85,13 @@ export class GameScene extends Phaser.Scene {
     create() {
         this.currentFloor = this.startFloor;
 
+        // Reset entity references (important for scene restart)
+        this.player = null;
+        this.companions = null;
+        this.activeBoss = null;
+        this._bossIntroTriggered = false;
+        this._pendingBoss = null;
+
         // ── Apply CRT shader (subtle in gameplay) ────────────────────────
         this.crtPipeline = applyCRTShader(this, 'classic');
 
@@ -288,7 +295,9 @@ export class GameScene extends Phaser.Scene {
         }
 
         // ── Stairs ───────────────────────────────────────────────────────
-        if (floorData.stairsPosition) {
+        // Don't create stairs on boss floors - stairs appear after boss defeat
+        const isBossFloor = !!getBossForFloor(floorNumber);
+        if (floorData.stairsPosition && !isBossFloor) {
             const sx = floorData.stairsPosition.x;
             const sy = floorData.stairsPosition.y;
             this.stairsZone = this.add.zone(sx, sy, GameConfig.TILE_SIZE, GameConfig.TILE_SIZE);
@@ -741,7 +750,9 @@ export class GameScene extends Phaser.Scene {
      * Boss spawns after intro scene completes.
      */
     _spawnBossIfNeeded(floorNumber, floorData) {
+        console.log('[GameScene] _spawnBossIfNeeded called for floor', floorNumber);
         const bossInfo = getBossForFloor(floorNumber);
+        console.log('[GameScene] getBossForFloor result:', bossInfo);
         if (!bossInfo) return;
 
         // Find the largest room for the boss

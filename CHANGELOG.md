@@ -9,9 +9,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Known Issues
-| Bug | Description | Discovered | Fixed |
-|-----|-------------|------------|-------|
-| Boss not spawning on floor 5 | First boss (Bone Sovereign) does not appear | 2026-03-02 | - |
+| # | Bug | Description | Discovered | Fixed |
+|---|-----|-------------|------------|-------|
+| 1 | Boss not spawning on floor 5 | First boss (Bone Sovereign) does not appear | 2026-03-02 | - |
+| 2 | No loading progress meter | Loading screen shows fixed green bar instead of actual progress | 2026-03-02 | - |
+| 3 | Monsters spawn offset from spawners | Enemies don't spawn exactly on the spawner positions | 2026-03-02 | - |
+| 4 | Player spawn doesn't match staircase | Player appears at random location instead of near staircase entrance | 2026-03-02 | - |
+| 5 | No mana cooldown visual | Missing visual indicator when mana ability is on cooldown | 2026-03-02 | - |
 
 ---
 

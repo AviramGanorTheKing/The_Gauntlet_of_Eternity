@@ -86,17 +86,19 @@ export class MoralChoiceSystem {
         // ── Atmosphere: drop music to ambient-only ──────────────────────
         if (this.scene.audioManager) {
             this.scene.audioManager.exitCombat();
-            // Further reduce to just ambient
+            // Further reduce to just ambient (with null checks)
             const stems = this.scene.audioManager.stems;
-            if (stems.percussion?.isPlaying) {
-                this.scene.tweens.add({ targets: stems.percussion, volume: 0, duration: 1000 });
-            }
-            if (stems.melody?.isPlaying) {
-                this.scene.tweens.add({ targets: stems.melody, volume: 0, duration: 800 });
-            }
-            // Reduce ambient volume for solemnity
-            if (stems.ambient?.isPlaying) {
-                this.scene.tweens.add({ targets: stems.ambient, volume: 0.3, duration: 1000 });
+            if (stems) {
+                if (stems.percussion?.isPlaying) {
+                    this.scene.tweens.add({ targets: stems.percussion, volume: 0, duration: 1000 });
+                }
+                if (stems.melody?.isPlaying) {
+                    this.scene.tweens.add({ targets: stems.melody, volume: 0, duration: 800 });
+                }
+                // Reduce ambient volume for solemnity
+                if (stems.ambient?.isPlaying) {
+                    this.scene.tweens.add({ targets: stems.ambient, volume: 0.3, duration: 1000 });
+                }
             }
         }
 
@@ -104,8 +106,12 @@ export class MoralChoiceSystem {
         this._pausedSpawners = [];
         if (this.scene.spawners) {
             this.scene.spawners.getChildren().forEach(spawner => {
-                if (spawner.active && spawner.spawnTimer) {
+                if (spawner.active && spawner.spawnTimer && typeof spawner.spawnTimer === 'object') {
                     spawner.spawnTimer.paused = true;
+                    this._pausedSpawners.push(spawner);
+                } else if (spawner.active) {
+                    // Mark spawner as paused even if timer is a different type
+                    spawner._wasPaused = true;
                     this._pausedSpawners.push(spawner);
                 }
             });
@@ -228,8 +234,15 @@ export class MoralChoiceSystem {
         // Resume spawners
         if (this._pausedSpawners) {
             for (const spawner of this._pausedSpawners) {
-                if (spawner.active && spawner.spawnTimer) {
-                    spawner.spawnTimer.paused = false;
+                if (spawner.active) {
+                    // Handle proper Timer objects
+                    if (spawner.spawnTimer && typeof spawner.spawnTimer === 'object') {
+                        spawner.spawnTimer.paused = false;
+                    }
+                    // Clear the backup paused flag
+                    if (spawner._wasPaused) {
+                        delete spawner._wasPaused;
+                    }
                 }
             }
             this._pausedSpawners = null;

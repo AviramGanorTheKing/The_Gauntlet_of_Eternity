@@ -78,10 +78,17 @@ export class DungeonManager {
         const biomeKey = this.currentBiome.key;
         const key = `tileset_${biomeKey}`;
 
-        if (this.scene.textures.exists(key)) return;
-
+        // Check if we have the real tileset source
         const srcTex = this.scene.textures.get('dungeon_tileset_src');
         const hasRealTileset = srcTex && srcTex.key !== '__MISSING';
+
+        // If texture already exists, just set the flag and return
+        // BUG FIX: Previously _useFullTileset wasn't set when texture existed,
+        // causing wrong tilemap rendering when teleporting between floors
+        if (this.scene.textures.exists(key)) {
+            this._useFullTileset = hasRealTileset;
+            return;
+        }
 
         if (hasRealTileset) {
             // Copy the full 384×160 tileset and apply biome tinting

@@ -5,6 +5,7 @@
 import { ClassData } from '../config/ClassData.js';
 import { EnemyData } from '../config/EnemyData.js';
 import { GameConfig } from '../config/GameConfig.js';
+import { EventBus, Events } from '../utils/EventBus.js';
 
 export function initDebugBridge(game) {
     const bridge = {
@@ -132,6 +133,106 @@ export function initDebugBridge(game) {
                 if (key in GameConfig) {
                     GameConfig[key] = value;
                 }
+            }
+        },
+
+        /**
+         * Teleport to a specific floor.
+         * @param {number} floorNumber - Target floor (1-25)
+         */
+        teleportToFloor(floorNumber) {
+            try {
+                const scene = this.getScene();
+                if (!scene) {
+                    console.warn('[DebugBridge] No active GameScene');
+                    return false;
+                }
+
+                const targetFloor = Math.max(1, Math.min(25, Math.floor(floorNumber)));
+                console.log(`[DebugBridge] Teleporting to floor ${targetFloor}`);
+
+                // Restart the scene with the new floor number
+                // This ensures a clean state without duplicate colliders/listeners
+                scene.scene.restart({
+                    floor: targetFloor,
+                    classKey: scene.classKey,
+                    companions: scene.companionKeys
+                });
+
+                console.log(`[DebugBridge] Teleport initiated to floor ${targetFloor}`);
+                return true;
+            } catch (err) {
+                console.error('[DebugBridge] Teleport failed:', err);
+                return false;
+            }
+        },
+
+        /**
+         * Get current floor number.
+         */
+        getCurrentFloor() {
+            return this.getScene()?.currentFloor || 1;
+        },
+
+        /**
+         * Toggle god mode (invincibility).
+         */
+        toggleGodMode() {
+            try {
+                const player = this.getPlayer();
+                if (!player) {
+                    console.warn('[DebugBridge] No player for god mode');
+                    return false;
+                }
+                player._godMode = !player._godMode;
+                player.isInvincible = player._godMode;
+                console.log(`[DebugBridge] God mode: ${player._godMode ? 'ON' : 'OFF'}`);
+                return player._godMode;
+            } catch (err) {
+                console.error('[DebugBridge] toggleGodMode failed:', err);
+                return false;
+            }
+        },
+
+        /**
+         * Check if god mode is active.
+         */
+        isGodMode() {
+            return this.getPlayer()?._godMode || false;
+        },
+
+        /**
+         * Give gold to player.
+         */
+        giveGold(amount) {
+            try {
+                const scene = this.getScene();
+                if (!scene) return;
+                scene.gold = (scene.gold || 0) + amount;
+                EventBus.emit(Events.GOLD_CHANGED, { gold: scene.gold });
+                console.log(`[DebugBridge] Gave ${amount} gold, total: ${scene.gold}`);
+            } catch (err) {
+                console.error('[DebugBridge] giveGold failed:', err);
+            }
+        },
+
+        /**
+         * Heal player to full.
+         */
+        fullHeal() {
+            try {
+                const player = this.getPlayer();
+                if (!player) {
+                    console.warn('[DebugBridge] No player to heal');
+                    return;
+                }
+                player.hp = player.maxHp;
+                player.mana = player.maxMana;
+                EventBus.emit(Events.PLAYER_HEALTH_CHANGED, { hp: player.hp, maxHp: player.maxHp });
+                EventBus.emit(Events.PLAYER_MANA_CHANGED, { mana: player.mana, maxMana: player.maxMana });
+                console.log(`[DebugBridge] Full heal: HP=${player.hp}/${player.maxHp}, Mana=${player.mana}/${player.maxMana}`);
+            } catch (err) {
+                console.error('[DebugBridge] fullHeal failed:', err);
             }
         },
     };

@@ -16,6 +16,9 @@ export class ProfileScene extends Phaser.Scene {
         const W = this.game.config.width;
         const H = this.game.config.height;
 
+        // Ensure title music is playing (comes from MenuScene)
+        this._ensureTitleMusic();
+
         applyCRTShader(this, 'subtle');
 
         // Background
@@ -325,5 +328,22 @@ export class ProfileScene extends Phaser.Scene {
         const hours = Math.floor(mins / 60);
         if (hours > 0) return `${hours}h ${mins % 60}m`;
         return `${mins}m`;
+    }
+
+    _ensureTitleMusic() {
+        // Check if title music is already playing
+        const playing = this.sound.sounds.find(s =>
+            s.key === 'music_title' && s.isPlaying
+        );
+        if (playing) return;
+
+        // Start title music
+        if (this.cache.audio.exists('music_title')) {
+            this._titleMusic = this.sound.add('music_title', {
+                loop: true,
+                volume: 0.6
+            });
+            this._titleMusic.play();
+        }
     }
 }

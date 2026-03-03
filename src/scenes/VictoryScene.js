@@ -63,6 +63,22 @@ export class VictoryScene extends Phaser.Scene {
         const theme = ENDING_THEMES[this.endingKey] || ENDING_THEMES.escape;
         const ending = LoreData.endings[this.endingKey];
 
+        // Stop any existing music and play ending theme
+        this.sound.stopAll();
+        if (this.cache.audio.exists('music_ending')) {
+            this._endingMusic = this.sound.add('music_ending', {
+                loop: true,
+                volume: 0
+            });
+            this._endingMusic.play();
+            // Fade in
+            this.tweens.add({
+                targets: this._endingMusic,
+                volume: 0.6,
+                duration: 2000
+            });
+        }
+
         // Apply CRT shader with ending-specific preset
         this.crtPipeline = applyCRTShader(this, theme.crtPreset);
 

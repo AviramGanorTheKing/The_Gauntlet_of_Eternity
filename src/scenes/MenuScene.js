@@ -124,6 +124,61 @@ export class MenuScene extends Phaser.Scene {
         this.add.text(W - 10, H - 10, 'v0.6.0 - Phase 6', {
             fontFamily: 'monospace', fontSize: '10px', color: '#444444'
         }).setOrigin(1, 1);
+
+        // Start title music (audio context already unlocked by BootScene click)
+        this._startTitleMusic();
+    }
+
+    _startTitleMusic() {
+        if (this._titleMusicStarted) return;
+
+        // Safety: resume audio context if still suspended
+        if (this.sound.context && this.sound.context.state === 'suspended') {
+            this.sound.context.resume();
+        }
+
+        // Check if title music is already playing (e.g., from ProfileScene)
+        const alreadyPlaying = this.sound.sounds.find(s =>
+            s.key === 'music_title' && s.isPlaying
+        );
+        if (alreadyPlaying) {
+            this._titleMusicStarted = true;
+            return;
+        }
+
+        // Stop any other music
+        this.sound.stopAll();
+
+        // Play title theme if available
+        if (this.cache.audio.exists('music_title')) {
+            this._titleMusic = this.sound.add('music_title', {
+                loop: true,
+                volume: 0
+            });
+            this._titleMusic.play();
+            this._titleMusicStarted = true;
+            // Fade in
+            this.tweens.add({
+                targets: this._titleMusic,
+                volume: 0.6,
+                duration: 1000
+            });
+        }
+    }
+
+    _stopTitleMusic() {
+        if (this._titleMusic && this._titleMusic.isPlaying) {
+            this.tweens.add({
+                targets: this._titleMusic,
+                volume: 0,
+                duration: 500,
+                onComplete: () => {
+                    this._titleMusic.stop();
+                    this._titleMusic.destroy();
+                    this._titleMusic = null;
+                }
+            });
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -731,6 +786,9 @@ export class MenuScene extends Phaser.Scene {
      * CRT glitch wipe: spike chromatic aberration + scanlines briefly, then fade to black.
      */
     _crtGlitchWipe(onComplete) {
+        // Stop title music
+        this._stopTitleMusic();
+
         // Disable further input
         this.input.keyboard.removeAllListeners();
         this.input.removeAllListeners();

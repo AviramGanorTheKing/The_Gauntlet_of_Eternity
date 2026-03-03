@@ -155,10 +155,12 @@ export class GameScene extends Phaser.Scene {
         }
 
         // ── EventBus ─────────────────────────────────────────────────────
+        // PERFORMANCE: Register all EventBus listeners ONCE in create(), not in buildFloor()
         EventBus.on(Events.ENEMY_DIED, this.onEnemyDied, this);
         EventBus.on(Events.PLAYER_DEATH, this.onPlayerDeath, this);
         EventBus.on(Events.ENEMY_SPAWNED, this.onEnemySpawned, this);
         EventBus.on('BOSS_DEFEATED', this.onBossDefeated, this);
+        EventBus.on(Events.PLAYER_ATTACK, this.onPlayerAttackSpawners, this);
 
         // ESC to pause
         this.input.keyboard.on('keydown-ESC', () => this._openPauseMenu());
@@ -263,9 +265,6 @@ export class GameScene extends Phaser.Scene {
 
         // Player-wall LAST — final authority on keeping player out of walls
         this.physics.add.collider(this.player, wallLayer);
-
-        // Player attacks hit spawners
-        EventBus.on(Events.PLAYER_ATTACK, this.onPlayerAttackSpawners, this);
 
         // Enemy projectile → player
         this.physics.add.overlap(this.player, this.enemyProjectiles, (player, proj) => {
@@ -667,7 +666,6 @@ export class GameScene extends Phaser.Scene {
 
                 // Build floor while screen is dark
                 this.physics.world.colliders.destroy();
-                EventBus.off(Events.PLAYER_ATTACK, this.onPlayerAttackSpawners, this);
                 if (this.stairsMarker) this.stairsMarker.destroy();
                 this.buildFloor(this.currentFloor);
 
@@ -750,9 +748,7 @@ export class GameScene extends Phaser.Scene {
      * Boss spawns after intro scene completes.
      */
     _spawnBossIfNeeded(floorNumber, floorData) {
-        console.log('[GameScene] _spawnBossIfNeeded called for floor', floorNumber);
         const bossInfo = getBossForFloor(floorNumber);
-        console.log('[GameScene] getBossForFloor result:', bossInfo);
         if (!bossInfo) return;
 
         // Find the largest room for the boss
@@ -778,16 +774,8 @@ export class GameScene extends Phaser.Scene {
         const triggerWidth = bossRoom.w * ts * 0.6;
         const triggerHeight = bossRoom.h * ts * 0.6;
 
-        console.log('[GameScene] Setting up boss trigger zone:', {
-            bossRoom, bx, by, triggerWidth, triggerHeight, bossInfo: bossInfo.name
-        });
-
         this._bossTriggerZone = this.add.zone(bx, by, triggerWidth, triggerHeight);
         this.physics.add.existing(this._bossTriggerZone, true);
-
-        // DEBUG: Visual indicator for trigger zone (red rectangle)
-        this._bossTriggerDebug = this.add.rectangle(bx, by, triggerWidth, triggerHeight, 0xff0000, 0.2)
-            .setDepth(5);
 
         // Add "boss ahead" warning text
         this._bossWarning = this.add.text(bx, by - 60, '⚠ DANGER AHEAD', {
@@ -802,13 +790,8 @@ export class GameScene extends Phaser.Scene {
 
         // When player enters the trigger zone, start boss intro
         this.physics.add.overlap(this.player, this._bossTriggerZone, () => {
-            console.log('[GameScene] Boss trigger zone overlap!', {
-                alreadyTriggered: this._bossIntroTriggered,
-                hasBoss: !!this.activeBoss
-            });
             if (this._bossIntroTriggered || this.activeBoss) return;
             this._bossIntroTriggered = true;
-            console.log('[GameScene] Triggering boss intro...');
             this._triggerBossIntro();
         });
     }
@@ -856,11 +839,8 @@ export class GameScene extends Phaser.Scene {
      * Actually spawn the boss after intro completes.
      */
     _spawnBoss(bossInfo, bx, by) {
-        console.log('[GameScene] _spawnBoss called', { key: bossInfo.key, bx, by });
         const BossClass = BOSS_CLASSES[bossInfo.key] || Boss;
-        console.log('[GameScene] Boss class:', BossClass?.name || 'Unknown');
         const boss = new BossClass(this, bx, by, bossInfo);
-        console.log('[GameScene] Boss created:', boss);
         boss.setTarget(this.player);
         this.enemies.add(boss);
         this.activeBoss = boss;

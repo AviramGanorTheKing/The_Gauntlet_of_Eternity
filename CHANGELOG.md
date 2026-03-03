@@ -8,6 +8,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Performance
+- **Boss attack listener cleanup**: All boss attack methods (projectile, homing, beam, spin, aoe_zone, cone_breath, gravity_well) now properly track and clean up their update listeners when the boss dies or scene shuts down
+- **Projectile listener tracking**: Player projectiles in CombatSystem now track their update listeners and clean them up on scene destroy
+- **EventBus listener hygiene**: Moved PLAYER_ATTACK listener registration from buildFloor() to create() to prevent potential accumulation
+- **Status effect icon cleanup**: Icons are now destroyed immediately when effects are removed, regardless of entity state
+
+### Fixed
+- **Removed debug visuals**: Removed red debug rectangle from boss trigger zones
+
 ### Known Issues
 | # | Bug | Description | Discovered | Fixed |
 |---|-----|-------------|------------|-------|

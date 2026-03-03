@@ -25,6 +25,9 @@ export class CombatSystem {
         this._dnPoolHead = 0; // round-robin index
         this._initDamageNumberPool();
 
+        // PERFORMANCE: Track active projectile update listeners for cleanup
+        this._activeProjectileListeners = [];
+
         // Listen for player attacks
         EventBus.on(Events.PLAYER_ATTACK, this.onPlayerAttack, this);
     }
@@ -92,6 +95,7 @@ export class CombatSystem {
         const maxRange = attackData.range || 300;
         const pierces = attackData.pierces || false;
         const knockback = attackData.knockback || 0.3;
+        const combatSystem = this;
 
         // Use existing 'projectile' texture as a sprite
         const proj = this.scene.add.sprite(player.x, player.y, 'projectile');
@@ -122,10 +126,12 @@ export class CombatSystem {
         const hitEnemies = new Set();
 
         const destroyProj = () => {
-            this.scene.events.off('update', update);
+            combatSystem.scene.events.off('update', update);
+            // PERFORMANCE: Untrack the listener
+            combatSystem._untrackProjectileListener(update);
             if (trailEmitter) {
                 trailEmitter.stop();
-                this.scene.time.delayedCall(300, () => {
+                combatSystem.scene.time.delayedCall(300, () => {
                     if (trailEmitter.active) trailEmitter.destroy();
                 });
             }
@@ -154,14 +160,14 @@ export class CombatSystem {
             }
 
             // Enemy collision check
-            if (!this.scene.enemies) return;
-            for (const enemy of this.scene.enemies.getChildren()) {
+            if (!combatSystem.scene.enemies) return;
+            for (const enemy of combatSystem.scene.enemies.getChildren()) {
                 if (!enemy.alive || hitEnemies.has(enemy)) continue;
                 const edx = proj.x - enemy.x;
                 const edy = proj.y - enemy.y;
                 if (edx * edx + edy * edy < 16 * 16) {
                     hitEnemies.add(enemy);
-                    this.dealDamage(player, enemy, attackPower, knockback, angle);
+                    combatSystem.dealDamage(player, enemy, attackPower, knockback, angle);
 
                     if (!pierces) {
                         destroyProj();
@@ -172,15 +178,15 @@ export class CombatSystem {
 
             // Spawner collision check (before wall check — spawners may
             // occupy tiles that isWalkable() reports as non-walkable)
-            for (const spawner of (this.scene.spawners?.getChildren() || [])) {
+            for (const spawner of (combatSystem.scene.spawners?.getChildren() || [])) {
                 if (!spawner.alive) continue;
                 const sdx = proj.x - spawner.x;
                 const sdy = proj.y - spawner.y;
                 if (sdx * sdx + sdy * sdy < 20 * 20) {
                     const dmg = spawner.takeDamage(attackPower);
                     if (dmg > 0) {
-                        this.applyWhiteFlash(spawner);
-                        this.showDamageNumber(spawner.x, spawner.y, dmg);
+                        combatSystem.applyWhiteFlash(spawner);
+                        combatSystem.showDamageNumber(spawner.x, spawner.y, dmg);
                     }
                     if (!pierces) {
                         destroyProj();
@@ -191,11 +197,11 @@ export class CombatSystem {
             }
 
             // Wall collision check
-            if (this.scene.dungeonManager) {
+            if (combatSystem.scene.dungeonManager) {
                 const ts = 32;
                 const tx = (proj.x / ts) | 0;
                 const ty = (proj.y / ts) | 0;
-                if (!this.scene.dungeonManager.isWalkable(tx, ty)) {
+                if (!combatSystem.scene.dungeonManager.isWalkable(tx, ty)) {
                     destroyProj();
                     return;
                 }
@@ -203,6 +209,16 @@ export class CombatSystem {
         };
 
         this.scene.events.on('update', update);
+        // PERFORMANCE: Track the listener for cleanup
+        this._activeProjectileListeners.push(update);
+    }
+
+    /**
+     * Helper to untrack a projectile listener when it naturally completes.
+     */
+    _untrackProjectileListener(listener) {
+        const idx = this._activeProjectileListeners.indexOf(listener);
+        if (idx !== -1) this._activeProjectileListeners.splice(idx, 1);
     }
 
     /**
@@ -443,6 +459,14 @@ export class CombatSystem {
 
     destroy() {
         EventBus.off(Events.PLAYER_ATTACK, this.onPlayerAttack, this);
+
+        // PERFORMANCE: Clean up all active projectile update listeners
+        if (this._activeProjectileListeners) {
+            for (const listener of this._activeProjectileListeners) {
+                this.scene.events.off('update', listener);
+            }
+            this._activeProjectileListeners = [];
+        }
 
         // Clean up pooled text objects
         for (const text of this._dnPool) {

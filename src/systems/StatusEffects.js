@@ -159,6 +159,9 @@ export class StatusEffects {
     }
 
     _removeEffect(entity, effectId, state) {
+        // PERFORMANCE: Always destroy icon first, regardless of entity state
+        if (state.icon?.active) state.icon.destroy();
+
         if (!entity.active) return;
         const def = state.def;
 
@@ -181,8 +184,6 @@ export class StatusEffects {
         const effects = this._active.get(entity);
         const hasOtherTint = effects && [...effects.keys()].some(id => id !== effectId && StatusEffectData[id]?.color);
         if (!hasOtherTint && entity.clearTint) entity.clearTint();
-
-        if (state.icon?.active) state.icon.destroy();
 
         EventBus.emit(Events.STATUS_EXPIRED, { entity, effectId });
     }

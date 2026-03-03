@@ -78,6 +78,11 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         this.attackTimers = [];
         this._initPhaseTimers();
 
+        // PERFORMANCE: Track active update listeners and delayed calls for cleanup
+        this._activeUpdateListeners = [];
+        this._activeDelayedCalls = [];
+        this._activeGraphics = [];
+
         // Telegraph indicator
         this._telegraphGfx = scene.add.graphics().setDepth(7);
 
@@ -174,6 +179,9 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
             this.body.setVelocity(0, 0);
             this.body.enable = false;
         }
+
+        // PERFORMANCE: Clean up all tracked update listeners
+        this._cleanupTrackedResources();
 
         // Cleanup graphics
         if (this._telegraphGfx?.active) this._telegraphGfx.destroy();
@@ -341,6 +349,7 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     _attackProjectile(atk) {
         if (!this.target || !this.scene) return;
         const scene = this.scene; // Capture scene reference before it becomes undefined
+        const boss = this;
         const target = this.target;
         const angle = Math.atan2(target.y - this.y, target.x - this.x);
         const speed = atk.speed || 180;
@@ -349,13 +358,20 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         proj.fillStyle(this.bossData.color, 0.9);
         proj.fillCircle(0, 0, 5);
         proj.setPosition(this.x, this.y);
+        this._trackGraphics(proj);
 
         const vx = Math.cos(angle) * speed;
         const vy = Math.sin(angle) * speed;
         let lifetime = 0;
 
+        const cleanup = () => {
+            scene.events.off('update', update);
+            boss._untrackUpdateListener(update);
+            if (proj.active) proj.destroy();
+        };
+
         const update = (time, delta) => {
-            if (!proj.active) return;
+            if (!proj.active || !boss.alive) { cleanup(); return; }
             lifetime += delta;
             proj.x += vx * (delta / 1000);
             proj.y += vy * (delta / 1000);
@@ -367,18 +383,17 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
                     EventBus.emit(Events.PLAYER_HEALTH_CHANGED, {
                         hp: target.hp, maxHp: target.maxHp
                     });
-                    scene.events.off('update', update);
-                    proj.destroy();
+                    cleanup();
                     return;
                 }
             }
 
             if (lifetime > 4000) {
-                scene.events.off('update', update);
-                proj.destroy();
+                cleanup();
             }
         };
         scene.events.on('update', update);
+        this._trackUpdateListener(update);
     }
 
     _attackBarrage(atk) {
@@ -430,6 +445,7 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     _attackHoming(atk) {
         if (!this.target || !this.scene) return;
         const scene = this.scene; // Capture scene reference
+        const boss = this;
         const target = this.target;
         const speed = atk.speed || 130;
         const maxLife = atk.duration || 3000;
@@ -438,12 +454,19 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         proj.fillStyle(0xff8844, 0.8);
         proj.fillCircle(0, 0, 4);
         proj.setPosition(this.x, this.y);
+        this._trackGraphics(proj);
 
         let lifetime = 0;
+
+        const cleanup = () => {
+            scene.events.off('update', update);
+            boss._untrackUpdateListener(update);
+            if (proj.active) proj.destroy();
+        };
+
         const update = (time, delta) => {
-            if (!proj.active || !target?.alive) {
-                scene.events.off('update', update);
-                if (proj.active) proj.destroy();
+            if (!proj.active || !target?.alive || !boss.alive) {
+                cleanup();
                 return;
             }
             lifetime += delta;
@@ -459,17 +482,16 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
                 EventBus.emit(Events.PLAYER_HEALTH_CHANGED, {
                     hp: target.hp, maxHp: target.maxHp
                 });
-                scene.events.off('update', update);
-                proj.destroy();
+                cleanup();
                 return;
             }
 
             if (lifetime > maxLife) {
-                scene.events.off('update', update);
-                proj.destroy();
+                cleanup();
             }
         };
         scene.events.on('update', update);
+        this._trackUpdateListener(update);
     }
 
     _attackCharge(atk) {
@@ -523,11 +545,17 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         let elapsed = 0;
 
         const beamGfx = scene.add.graphics().setDepth(7);
+        this._trackGraphics(beamGfx);
+
+        const cleanup = () => {
+            scene.events.off('update', update);
+            boss._untrackUpdateListener(update);
+            if (beamGfx.active) beamGfx.destroy();
+        };
 
         const update = (time, delta) => {
             if (!boss.alive) {
-                scene.events.off('update', update);
-                beamGfx.destroy();
+                cleanup();
                 return;
             }
             elapsed += delta;
@@ -551,11 +579,11 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
             }
 
             if (elapsed >= duration) {
-                scene.events.off('update', update);
-                beamGfx.destroy();
+                cleanup();
             }
         };
         scene.events.on('update', update);
+        this._trackUpdateListener(update);
     }
 
     _attackSpin(atk) {
@@ -567,6 +595,13 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         let elapsed = 0;
 
         const gfx = scene.add.graphics().setDepth(7);
+        this._trackGraphics(gfx);
+
+        const cleanup = () => {
+            scene.events.off('update', update);
+            boss._untrackUpdateListener(update);
+            if (gfx.active) gfx.destroy();
+        };
 
         const update = (time, delta) => {
             elapsed += delta;
@@ -582,11 +617,11 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
             }
 
             if (elapsed >= duration || !boss.alive) {
-                scene.events.off('update', update);
-                gfx.destroy();
+                cleanup();
             }
         };
         scene.events.on('update', update);
+        this._trackUpdateListener(update);
     }
 
     _attackAoeZone(atk) {
@@ -608,10 +643,17 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
             const zone = scene.add.graphics().setDepth(6);
             zone.fillStyle(0x44aa22, 0.15);
             zone.fillCircle(zx, zy, radius);
+            this._trackGraphics(zone);
 
             let elapsed = 0;
             const tickInterval = 500;
             let tickTimer = 0;
+
+            const cleanup = () => {
+                scene.events.off('update', update);
+                boss._untrackUpdateListener(update);
+                if (zone.active) zone.destroy();
+            };
 
             const update = (time, delta) => {
                 elapsed += delta;
@@ -628,11 +670,11 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
                 }
 
                 if (elapsed >= duration || !boss.alive) {
-                    scene.events.off('update', update);
-                    zone.destroy();
+                    cleanup();
                 }
             };
             scene.events.on('update', update);
+            this._trackUpdateListener(update);
         }
     }
 
@@ -694,6 +736,13 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         let tickTimer = 0;
 
         const gfx = scene.add.graphics().setDepth(7);
+        this._trackGraphics(gfx);
+
+        const cleanup = () => {
+            scene.events.off('update', update);
+            boss._untrackUpdateListener(update);
+            if (gfx.active) gfx.destroy();
+        };
 
         const update = (time, delta) => {
             elapsed += delta;
@@ -720,11 +769,11 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
             }
 
             if (elapsed >= duration || !boss.alive) {
-                scene.events.off('update', update);
-                gfx.destroy();
+                cleanup();
             }
         };
         scene.events.on('update', update);
+        this._trackUpdateListener(update);
     }
 
     _attackTeleportSlash(atk) {
@@ -770,6 +819,13 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         let elapsed = 0;
 
         const gfx = scene.add.graphics().setDepth(6);
+        this._trackGraphics(gfx);
+
+        const cleanup = () => {
+            scene.events.off('update', update);
+            boss._untrackUpdateListener(update);
+            if (gfx.active) gfx.destroy();
+        };
 
         const update = (time, delta) => {
             elapsed += delta;
@@ -797,11 +853,81 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
             }
 
             if (elapsed >= duration || !boss.alive) {
-                scene.events.off('update', update);
-                gfx.destroy();
+                cleanup();
             }
         };
         scene.events.on('update', update);
+        this._trackUpdateListener(update);
+    }
+
+    /**
+     * PERFORMANCE: Clean up all tracked update listeners, delayed calls, and graphics.
+     * Called from die() and destroy() to prevent memory leaks.
+     */
+    _cleanupTrackedResources() {
+        const scene = this.scene;
+        if (!scene) return;
+
+        // Remove all tracked update listeners
+        if (this._activeUpdateListeners) {
+            for (const listener of this._activeUpdateListeners) {
+                scene.events.off('update', listener);
+            }
+            this._activeUpdateListeners = [];
+        }
+
+        // Cancel all tracked delayed calls
+        if (this._activeDelayedCalls) {
+            for (const call of this._activeDelayedCalls) {
+                if (call && call.remove) call.remove();
+            }
+            this._activeDelayedCalls = [];
+        }
+
+        // Destroy all tracked graphics
+        if (this._activeGraphics) {
+            for (const gfx of this._activeGraphics) {
+                if (gfx?.active) gfx.destroy();
+            }
+            this._activeGraphics = [];
+        }
+    }
+
+    /**
+     * Helper to track an update listener for later cleanup.
+     */
+    _trackUpdateListener(listener) {
+        if (this._activeUpdateListeners) {
+            this._activeUpdateListeners.push(listener);
+        }
+    }
+
+    /**
+     * Helper to untrack a listener when it naturally completes.
+     */
+    _untrackUpdateListener(listener) {
+        if (this._activeUpdateListeners) {
+            const idx = this._activeUpdateListeners.indexOf(listener);
+            if (idx !== -1) this._activeUpdateListeners.splice(idx, 1);
+        }
+    }
+
+    /**
+     * Helper to track a delayed call for later cleanup.
+     */
+    _trackDelayedCall(call) {
+        if (this._activeDelayedCalls) {
+            this._activeDelayedCalls.push(call);
+        }
+    }
+
+    /**
+     * Helper to track a graphics object for later cleanup.
+     */
+    _trackGraphics(gfx) {
+        if (this._activeGraphics) {
+            this._activeGraphics.push(gfx);
+        }
     }
 
     /**
@@ -809,6 +935,9 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
      * Called when direct destruction occurs (e.g., scene cleanup).
      */
     destroy(fromScene) {
+        // Clean up tracked resources first
+        this._cleanupTrackedResources();
+
         if (this._telegraphGfx) {
             this._telegraphGfx.destroy();
             this._telegraphGfx = null;

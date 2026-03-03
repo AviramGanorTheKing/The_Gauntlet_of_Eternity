@@ -11,11 +11,42 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Known Issues
 | # | Bug | Description | Discovered | Fixed |
 |---|-----|-------------|------------|-------|
-| 1 | Boss not spawning on floor 5 | First boss (Bone Sovereign) does not appear | 2026-03-02 | - |
-| 2 | No loading progress meter | Loading screen shows fixed green bar instead of actual progress | 2026-03-02 | - |
 | 3 | Monsters spawn offset from spawners | Enemies don't spawn exactly on the spawner positions | 2026-03-02 | - |
 | 4 | Player spawn doesn't match staircase | Player appears at random location instead of near staircase entrance | 2026-03-02 | - |
 | 5 | No mana cooldown visual | Missing visual indicator when mana ability is on cooldown | 2026-03-02 | - |
+
+---
+
+## [0.6.2] - 2026-03-03
+
+### Added
+- **Music System**: Full 8-bit soundtrack integration (CodeManu music pack)
+  - 20 music tracks across menus, gameplay, bosses, shops, and more
+  - Title Theme for menus and character selection
+  - Main Theme for all gameplay biomes
+  - Boss Battle theme for regular bosses
+  - Final Boss theme for Void Architect (floor 25)
+  - Take Some Rest theme for shops
+  - Victory fanfare for boss defeats
+  - Game Over and Ending themes
+- **Loading Screen Improvements**
+  - Real-time loading bar with percentage display (0% → 100%)
+  - "Click anywhere to start" prompt after loading completes
+  - Click-to-start unlocks audio context (fixes browser autoplay policy)
+  - Smooth fade transition to menu
+
+### Fixed
+- **Boss not spawning on teleport**: Reset `_bossIntroTriggered` flag on scene restart
+- **Stairs visible on boss floors**: Stairs now only appear after boss is defeated
+- **Double music playing**: Fixed title music overlapping with gameplay music during scene transitions
+- **DungeonManager tileset flag**: Fixed `_useFullTileset` not being set on scene restart
+- **Boss attack scene references**: Captured scene references in all boss attack methods to prevent null errors
+
+### Changed
+- AudioManager now stops any lingering title music when starting biome music
+- CharSelectScene stops title music immediately instead of using tweens
+- MenuScene simplified music handling (audio context already unlocked by BootScene)
+- Biome music now uses Main Theme for all gameplay areas (unified soundtrack)
 
 ---
 
@@ -71,5 +102,6 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 0.6.2 | 2026-03-03 | Music system, loading screen improvements, boss spawn fixes |
 | 0.6.1 | 2026-03-02 | Alternative aim mode (movement-based shooting) |
 | 0.6.0 | 2026-03-02 | Initial release |

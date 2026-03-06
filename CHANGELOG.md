@@ -9,6 +9,38 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **FeatureFlags System**: Master on/off switches for every experimental feature
+  - `src/config/FeatureFlags.js` — all flags default to `false`; game is identical to baseline until a flag is enabled
+  - Exposed on `window.FeatureFlags` so flags can be toggled live in browser devtools during a run
+  - Stable baseline tagged as `v0.6.2-stable` in git — always revertable
+- **Balance Panel — FEATURES Tab**: New 5th tab in the G-key debug panel
+  - Lists all feature flags grouped by category (Graphics, Combat Feel, UX & Polish, Content & Design)
+  - Implemented flags show a live **ON/OFF** toggle that writes directly to `FeatureFlags` — no reload needed
+  - Unimplemented flags are grayed out with a **SOON** badge
+- **SCREEN_SHAKE** *(flag: off by default)*: Camera shake on combat hits
+  - Light shake (80ms / 0.002) on every enemy hit
+  - Stronger shake (150ms / 0.005) when the player takes damage
+- **DAMAGE_VIGNETTE** *(flag: off by default)*: Red border flash when player is hit
+  - Four Graphics rects at screen edges, depth 999, fixed to camera, fade out in 250ms
+- **WEAPON_SWAP_SFX** *(flag: off by default)*: Plays `sfx_equip` sound on weapon swap
+- **CRIT_SYSTEM** *(flag: off by default)*: Crit rolls in combat
+  - Checks `source.critChance` before defence is applied; 1.5× damage multiplier on crit
+  - Emits `isCrit` flag on `ENTITY_DAMAGED` event for downstream systems
+- **DYNAMIC_DAMAGE_NUMBERS** *(flag: off by default)*: Damage numbers vary by hit type
+  - Crits: gold `20px` text with `!` suffix, scale 1.25×, floats 55px
+  - Heals: green, slower float (1.3× duration)
+  - Normal hits: unchanged from baseline
+- **HIT_PARTICLES** *(flag: off by default)*: Spark burst at point of impact
+  - 6 Arc GameObjects (no texture needed) radiate from hit position in attacker's class colour
+  - Crits spawn 10 larger particles
+- **DEATH_PARTICLES** *(flag: off by default)*: Particle burst when enemy dies
+  - 12 coloured circles explode radially; colour matches enemy type
+  - (swarmer=brown, bruiser=tan, ranged=blue, bomber=orange, elite=purple)
+- **DODGE_IFRAME_AURA** *(flag: off by default)*: Blue pulsing ring during dodge iframes
+  - Appears exactly when iframes start, disappears when they end (not tied to full animation)
+  - Pulsing scale tween (1.0→1.25×) makes the protection window clearly readable
+
+### Added
 - **Dual Weapon System**: Players carry two weapons and swap with 1/2 keys
   - Each weapon type has distinct attack behavior (range, arc, speed, knockback)
   - Auto-equip fills empty slots first, then replaces inactive weapon if better

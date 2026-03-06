@@ -39,6 +39,24 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **DODGE_IFRAME_AURA** *(flag: off by default)*: Blue pulsing ring during dodge iframes
   - Appears exactly when iframes start, disappears when they end (not tied to full animation)
   - Pulsing scale tween (1.0→1.25×) makes the protection window clearly readable
+- **WEAPON_LEVELUP_FANFARE** *(flag: off by default)*: Celebration on weapon progression
+  - Level-up: white camera flash + powerup SFX (`sfx_sounds_powerup4`)
+  - Perk unlock: gold camera flash + fanfare SFX (`sfx_sounds_fanfare2`) + subtle shake
+  - Effects routed through GameScene camera so the UIScene overlay stays crisp
+- **BOSS_PHASE_VFX** *(flag: off by default)*: Replaces plain orange flash on phase change
+  - 6-frame boss blink sequence (rapid alpha flicker over 300ms)
+  - Expanding shockwave ring (scale 1→6, alpha 1→0 over 500ms) in boss colour
+  - 16-particle radial burst matching boss colour
+  - Camera shake 250ms / 0.008 intensity
+- **FLOOR_DIFFICULTY_SCALE** *(flag: off by default)*: Enemy stat scaling per floor
+  - HP: `baseHp × (1 + (floor - 1) × 0.12)` — floor 10 enemies have ~2× HP
+  - Damage: `baseDmg × (1 + (floor - 1) × 0.08)`
+  - Applied after entity construction so all enemy subclasses benefit automatically
+- **BOSS_ENTRANCE** *(flag: off by default)*: Dramatic 2-second sequence when boss spawns
+  - Boss starts at alpha 0 (invisible)
+  - Black camera flash (300ms) + shake (400ms / 0.012)
+  - Boss fades in over 600ms with red expanding shockwave ring at spawn point
+  - Falls back to original 200ms shake when flag is off
 
 ### Added
 - **Dual Weapon System**: Players carry two weapons and swap with 1/2 keys

@@ -103,6 +103,11 @@ export class GameScene extends Phaser.Scene {
         this.progression.computeActiveEffects(this.classKey);
         this.moralChoices = new MoralChoiceSystem(this);
         this.runStartTime = Date.now();
+        // Per-floor stat snapshots for FLOOR_TRANSITION_SCREEN
+        this._floorStartTime   = Date.now();
+        this._floorStartKills  = 0;
+        this._floorStartGold   = 0;
+        this._floorStartDamage = 0;
 
         // ── Audio & Announcer ─────────────────────────────────────────
         this.audioManager = new AudioManager(this);
@@ -150,6 +155,16 @@ export class GameScene extends Phaser.Scene {
         const firstBiome = this.dungeonManager?.getBiome()?.key;
         if (firstBiome) {
             this.audioManager.playBiomeMusic(firstBiome);
+        }
+
+        // [FEATURE: BIOME_COLOR_GRADING] Fullscreen tint overlay — sits above all game objects
+        // but below UIScene (which is a separate scene rendered on top).
+        {
+            const W = this.game.config.width;
+            const H = this.game.config.height;
+            this._biomeTintOverlay = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0)
+                .setScrollFactor(0).setDepth(800);
+            this._applyBiomeColorGrading(firstBiome);
         }
 
         // ── Launch UIScene in parallel (no camera, runs above game) ─────
@@ -627,6 +642,16 @@ export class GameScene extends Phaser.Scene {
     descendFloor() {
         if (this._descending) return;
         this._descending = true;
+
+        // Snapshot per-floor stats BEFORE incrementing floor
+        const completedFloor = this.currentFloor;
+        const floorKills    = (this.player?.killCount || 0) - (this._floorStartKills || 0);
+        const floorGold     = (this.player?.gold || 0) - (this._floorStartGold || 0);
+        const floorDamage   = (this.player?.damageDealt || 0) - (this._floorStartDamage || 0);
+        const floorElapsed  = Date.now() - (this._floorStartTime || Date.now());
+        const floorSecs     = Math.floor(floorElapsed / 1000);
+        const floorTimeStr  = `${Math.floor(floorSecs / 60)}:${String(floorSecs % 60).padStart(2, '0')}`;
+
         this.currentFloor++;
 
         // Track previous biome for transition detection
@@ -645,14 +670,33 @@ export class GameScene extends Phaser.Scene {
         const tips = LoreData.floorTransitionTips;
         const tip = tips[Math.floor(Math.random() * tips.length)];
 
-        const tipText = this.add.text(W / 2, H / 2, '', {
+        // [FEATURE: FLOOR_TRANSITION_SCREEN] Stats block above the floor label
+        let statsText = null;
+        if (FeatureFlags.FLOOR_TRANSITION_SCREEN) {
+            const statsLines = [
+                `FLOOR ${completedFloor} COMPLETE`,
+                ``,
+                `Kills    ${floorKills}`,
+                `Gold     +${floorGold > 0 ? floorGold : 0}`,
+                `Damage   ${Math.floor(floorDamage)}`,
+                `Time     ${floorTimeStr}`,
+            ].join('\n');
+
+            statsText = this.add.text(W / 2, H / 2 - 70, statsLines, {
+                fontFamily: 'monospace', fontSize: '13px',
+                color: '#ccccdd', stroke: '#000', strokeThickness: 2,
+                align: 'center', lineSpacing: 4,
+            }).setOrigin(0.5).setScrollFactor(0).setDepth(901).setAlpha(0);
+        }
+
+        const tipText = this.add.text(W / 2, FeatureFlags.FLOOR_TRANSITION_SCREEN ? H / 2 + 60 : H / 2, '', {
             fontFamily: 'monospace', fontSize: '11px',
             color: '#888899', stroke: '#000', strokeThickness: 2,
             align: 'center', wordWrap: { width: 400 },
         }).setOrigin(0.5).setScrollFactor(0).setDepth(901).setAlpha(0);
 
-        const floorLabel = this.add.text(W / 2, H / 2 - 30, `FLOOR ${this.currentFloor}`, {
-            fontFamily: 'monospace', fontSize: '16px',
+        const floorLabel = this.add.text(W / 2, FeatureFlags.FLOOR_TRANSITION_SCREEN ? H / 2 + 38 : H / 2 - 30, `→ FLOOR ${this.currentFloor}`, {
+            fontFamily: 'monospace', fontSize: '14px',
             color: '#ffcc00', stroke: '#000', strokeThickness: 3,
         }).setOrigin(0.5).setScrollFactor(0).setDepth(901).setAlpha(0);
 
@@ -662,7 +706,8 @@ export class GameScene extends Phaser.Scene {
             alpha: 1,
             duration: 300,
             onComplete: () => {
-                // Show floor label and tip
+                // Show stats (if enabled), floor label, and tip
+                if (statsText) statsText.setAlpha(1);
                 floorLabel.setAlpha(1);
                 tipText.setAlpha(1);
                 tipText.setText(tip);
@@ -672,11 +717,20 @@ export class GameScene extends Phaser.Scene {
                 if (this.stairsMarker) this.stairsMarker.destroy();
                 this.buildFloor(this.currentFloor);
 
+                // Reset per-floor counters for next floor
+                this._floorStartKills   = this.player?.killCount || 0;
+                this._floorStartGold    = this.player?.gold || 0;
+                this._floorStartDamage  = this.player?.damageDealt || 0;
+                this._floorStartTime    = Date.now();
+
                 // Update music for new biome if changed
                 const newBiome = this.dungeonManager?.getBiome()?.key;
                 if (newBiome && this.audioManager) {
                     this.audioManager.playBiomeMusic(newBiome);
                 }
+
+                // [FEATURE: BIOME_COLOR_GRADING] crossfade tint to new biome colour
+                this._applyBiomeColorGrading(newBiome);
 
                 // Announcer floor transition
                 if (this.announcer) {
@@ -690,16 +744,20 @@ export class GameScene extends Phaser.Scene {
                     this.moralChoices.applyRoomEntryConsequences();
                 }
 
-                // Hold for reading, then fade out
-                this.time.delayedCall(800, () => {
+                // Hold longer when showing stats so player can read them
+                const holdMs = FeatureFlags.FLOOR_TRANSITION_SCREEN ? 1800 : 800;
+                this.time.delayedCall(holdMs, () => {
+                    const targets = [overlay, tipText, floorLabel];
+                    if (statsText) targets.push(statsText);
                     this.tweens.add({
-                        targets: [overlay, tipText, floorLabel],
+                        targets,
                         alpha: 0,
                         duration: 400,
                         onComplete: () => {
                             overlay.destroy();
                             tipText.destroy();
                             floorLabel.destroy();
+                            statsText?.destroy();
                             this._descending = false;
                         }
                     });
@@ -845,6 +903,38 @@ export class GameScene extends Phaser.Scene {
                 bossSpawned = true;
                 this._spawnBoss(bossInfo, bx, by);
             }
+        });
+    }
+
+    // ── Biome Color Grading ───────────────────────────────────────────────
+
+    /**
+     * Crossfade the fullscreen tint overlay to the new biome's colour palette.
+     * Called on first floor load and on every biome transition.
+     * [FEATURE: BIOME_COLOR_GRADING]
+     */
+    _applyBiomeColorGrading(biomeKey) {
+        if (!this._biomeTintOverlay) return;
+
+        const TINTS = {
+            crypt:        { color: 0x441166, alpha: 0.15 }, // deep purple — gothic crypts
+            caves:        { color: 0x224422, alpha: 0.12 }, // sickly green — bioluminescent fungal
+            fungalCaves:  { color: 0x224422, alpha: 0.12 },
+            fortress:     { color: 0x223344, alpha: 0.12 }, // cold steel blue — iron fortress
+            ironFortress: { color: 0x223344, alpha: 0.12 },
+            inferno:      { color: 0x441100, alpha: 0.15 }, // hot orange-red — hellfire
+            abyss:        { color: 0x110022, alpha: 0.18 }, // void black-purple — the abyss
+        };
+
+        const tint = TINTS[biomeKey] || { color: 0x000000, alpha: 0 };
+        const targetAlpha = FeatureFlags.BIOME_COLOR_GRADING ? tint.alpha : 0;
+
+        this._biomeTintOverlay.setFillStyle(tint.color);
+        this.tweens.add({
+            targets: this._biomeTintOverlay,
+            alpha: targetAlpha,
+            duration: 800,
+            ease: 'Sine.easeInOut',
         });
     }
 

@@ -411,7 +411,7 @@ export class DebugBalancePanel {
                     { key: 'DODGE_IFRAME_AURA',   label: 'Iframe Aura on Dodge',        implemented: true  },
                     { key: 'PROJECTILE_GLOW',     label: 'Projectile Glow Ring',        implemented: false },
                     { key: 'STATUS_EFFECT_AURA',  label: 'Status Aura on Entities',     implemented: false },
-                    { key: 'BIOME_COLOR_GRADING', label: 'Biome Color Grading (CRT)',   implemented: false },
+                    { key: 'BIOME_COLOR_GRADING', label: 'Biome Color Grading (CRT)',   implemented: true  },
                     { key: 'BOSS_PHASE_VFX',      label: 'Boss Phase Transition VFX',   implemented: true  },
                 ],
             },
@@ -431,9 +431,9 @@ export class DebugBalancePanel {
                 flags: [
                     { key: 'WEAPON_SWAP_SFX',       label: 'Weapon Swap SFX',           implemented: true  },
                     { key: 'BOSS_ENTRANCE',          label: 'Boss Entrance Sequence',    implemented: true  },
-                    { key: 'FLOOR_TRANSITION_SCREEN',label: 'Floor Transition Summary',  implemented: false },
-                    { key: 'TUTORIAL_HINTS',         label: 'Context Hints (New Player)',implemented: false },
-                    { key: 'LOW_HEALTH_HEARTBEAT',   label: 'Low HP Heartbeat Audio',    implemented: false },
+                    { key: 'FLOOR_TRANSITION_SCREEN',label: 'Floor Transition Summary',  implemented: true  },
+                    { key: 'TUTORIAL_HINTS',         label: 'Context Hints (New Player)',implemented: true  },
+                    { key: 'LOW_HEALTH_HEARTBEAT',   label: 'Low HP Heartbeat Audio',    implemented: true  },
                     { key: 'WEAPON_LEVELUP_FANFARE', label: 'Weapon Level-Up Fanfare',   implemented: true  },
                 ],
             },
@@ -444,11 +444,39 @@ export class DebugBalancePanel {
                     { key: 'EVENT_ROOMS',           label: 'Random Event Rooms',        implemented: false },
                     { key: 'SHOP_VARIETY',          label: 'Shop Archetypes',           implemented: false },
                     { key: 'FLOOR_DIFFICULTY_SCALE',label: 'Floor Difficulty Scaling',  implemented: true  },
-                    { key: 'LOOT_PITY',             label: 'Loot Pity Counter',         implemented: false },
+                    { key: 'LOOT_PITY',             label: 'Loot Pity Counter',         implemented: true  },
                     { key: 'ASCENSION_PERKS',       label: 'Class Ascension Perks',     implemented: false },
                 ],
             },
         ];
+
+        // ── All ON / All OFF bulk buttons ──────────────────────────────────
+        const bulkRow = document.createElement('div');
+        bulkRow.style.cssText = `
+            display: flex; gap: 8px; margin-bottom: 10px; padding-bottom: 10px;
+            border-bottom: 1px solid #444;
+        `;
+
+        const allImplemented = sections.flatMap(s => s.flags.filter(f => f.implemented).map(f => f.key));
+
+        const makeAllBtn = (label, color, value) => {
+            const btn = document.createElement('button');
+            btn.textContent = label;
+            btn.style.cssText = `
+                flex: 1; padding: 5px 0; background: ${color}; color: #000;
+                border: none; border-radius: 3px; font-size: 11px; font-weight: bold;
+                cursor: pointer; font-family: monospace; letter-spacing: 1px;
+            `;
+            btn.onclick = () => {
+                for (const key of allImplemented) FF[key] = value;
+                this._renderTab(); // re-render to update all toggles
+            };
+            return btn;
+        };
+
+        bulkRow.appendChild(makeAllBtn('ALL ON',  '#44ff88', true));
+        bulkRow.appendChild(makeAllBtn('ALL OFF', '#ff6644', false));
+        this.content.appendChild(bulkRow);
 
         for (const section of sections) {
             // Section header

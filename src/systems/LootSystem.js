@@ -1,7 +1,8 @@
 import { Pickup } from '../entities/Pickup.js';
-import { rollRarity, rollGearItem, RARITY_WEIGHTS } from '../config/GearData.js';
+import { rollRarity, rollGearItem, RARITY_WEIGHTS, RARITY } from '../config/GearData.js';
 import { EventBus, Events } from '../utils/EventBus.js';
 import { GameConfig } from '../config/GameConfig.js';
+import { FeatureFlags } from '../config/FeatureFlags.js';
 
 /**
  * LootSystem — handles loot drops on enemy death and floor pickups.
@@ -17,6 +18,9 @@ export class LootSystem {
      */
     constructor(scene) {
         this.scene = scene;
+
+        /** [FEATURE: LOOT_PITY] Non-legendary gear drops since last legendary. Guaranteed at 50. */
+        this._pityCounter = 0;
 
         // Listen for enemy death events
         EventBus.on(Events.ENEMY_DIED, this.onEnemyDied, this);
@@ -47,7 +51,20 @@ export class LootSystem {
 
         // ── Gear drop ────────────────────────────────────────────────────
         if (Math.random() < GameConfig.LOOT_GEAR_CHANCE) {
-            const rarity = rollRarity();
+            let rarity = rollRarity();
+
+            // [FEATURE: LOOT_PITY] Guarantee a legendary after 50 non-legendary drops
+            if (FeatureFlags.LOOT_PITY) {
+                if (this._pityCounter >= 50) {
+                    rarity = RARITY.LEGENDARY;
+                }
+                if (rarity === RARITY.LEGENDARY) {
+                    this._pityCounter = 0;
+                } else {
+                    this._pityCounter++;
+                }
+            }
+
             const slot = Phaser.Utils.Array.GetRandom(['weapon', 'armor', 'accessory']);
             const item = rollGearItem(slot, rarity, classKey);
             const pickup = new Pickup(this.scene, x + Phaser.Math.Between(-8, 8), y + Phaser.Math.Between(-8, 8), 'gear', item);

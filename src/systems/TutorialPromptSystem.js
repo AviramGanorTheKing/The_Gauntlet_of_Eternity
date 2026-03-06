@@ -25,6 +25,7 @@
 
 import { EventBus, Events } from '../utils/EventBus.js';
 import { saveManager } from './SaveManager.js';
+import { FeatureFlags } from '../config/FeatureFlags.js';
 
 const PROMPTS = {
     first_enemy:   { text: 'Click to attack',          dismissOnEvent: Events.PLAYER_ATTACK },
@@ -114,6 +115,8 @@ export class TutorialPromptSystem {
     // ══════════════════════════════════════════════════════════════════════════
 
     _showPrompt(key, worldX, worldY) {
+        // [FEATURE: TUTORIAL_HINTS] Gate all prompts behind the flag
+        if (!FeatureFlags.TUTORIAL_HINTS) return;
         if (this._shown.has(key) || !this.enabled) return;
         if (this._activePrompt) this._dismiss(); // clear previous
 

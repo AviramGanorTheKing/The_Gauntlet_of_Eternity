@@ -8,6 +8,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.7.0] - 2026-03-06
+
 ### Added
 - **FeatureFlags System**: Master on/off switches for every experimental feature
   - `src/config/FeatureFlags.js` — all flags default to `false`; game is identical to baseline until a flag is enabled
@@ -52,6 +56,28 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - HP: `baseHp × (1 + (floor - 1) × 0.12)` — floor 10 enemies have ~2× HP
   - Damage: `baseDmg × (1 + (floor - 1) × 0.08)`
   - Applied after entity construction so all enemy subclasses benefit automatically
+- **FLOOR_TRANSITION_SCREEN** *(flag: off by default)*: Per-floor stats summary on floor descent
+  - Snapshots kills, gold earned, damage dealt, and time on the current floor before advancing
+  - Stats displayed as a text block during the dark overlay (1800ms hold vs 800ms without flag)
+  - Stats reset after the new floor is built
+- **TUTORIAL_HINTS** *(flag: off by default)*: Contextual first-run hints for new players
+  - Gates the existing `TutorialPromptSystem` — all prompts are suppressed until flag is enabled
+  - Each hint shown exactly once per save profile (persisted via `saveManager.updatePermanent`)
+  - Typewriter reveal, auto-dismiss after 4 seconds, or on relevant player action
+- **LOW_HEALTH_HEARTBEAT** *(flag: off by default)*: Looping alarm audio when player HP is critical
+  - Starts `announcer_health_warning` loop when HP drops below 25%
+  - Switches to `announcer_health_critical` loop if HP drops below 10%
+  - Stops immediately when HP recovers above 25%
+  - Automatically silenced on floor transitions via `resetCombatState()`
+- **LOOT_PITY** *(flag: off by default)*: Guaranteed legendary after 50 non-legendary gear drops
+  - Pity counter tracks non-legendary gear drops within a run (resets on run end)
+  - When counter reaches 50, the next gear drop is forced to `RARITY.LEGENDARY` and counter resets
+  - Counter also resets on any natural legendary drop
+- **BIOME_COLOR_GRADING** *(flag: off by default)*: Per-biome fullscreen color tint overlay
+  - Fullscreen rectangle at depth 800 / scrollFactor 0 — sits above game objects, below UIScene
+  - Crossfades over 800ms on biome entry (Sine ease)
+  - Crypt: deep purple (α 0.15) · Fungal Caves: sickly green (α 0.12) · Iron Fortress: cold steel blue (α 0.12) · Inferno: hot orange-red (α 0.15) · The Abyss: void black-purple (α 0.18)
+  - No shader changes required — works in both Canvas and WebGL
 - **BOSS_ENTRANCE** *(flag: off by default)*: Dramatic 2-second sequence when boss spawns
   - Boss starts at alpha 0 (invisible)
   - Black camera flash (300ms) + shake (400ms / 0.012)
@@ -187,6 +213,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 0.7.0 | 2026-03-06 | FeatureFlags system, 17 experimental features, dual weapons, weapon XP & perks |
 | 0.6.2 | 2026-03-03 | Music system, loading screen improvements, boss spawn fixes |
 | 0.6.1 | 2026-03-02 | Alternative aim mode (movement-based shooting) |
 | 0.6.0 | 2026-03-02 | Initial release |

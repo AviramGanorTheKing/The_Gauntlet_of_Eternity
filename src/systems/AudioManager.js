@@ -17,6 +17,7 @@
  */
 
 import { EventBus, Events } from '../utils/EventBus.js';
+import { FeatureFlags } from '../config/FeatureFlags.js';
 
 /**
  * Music track definitions per biome.
@@ -95,6 +96,10 @@ export class AudioManager {
 
         /** Low HP state */
         this._lowHp = false;
+
+        /** Heartbeat sound reference (LOW_HEALTH_HEARTBEAT feature) */
+        this._heartbeatSound = null;
+        this._heartbeatCritical = false;
 
         // EventBus listeners — music layer transitions
         EventBus.on(Events.ENEMY_SPAWNED, this._onEnemySpawned, this);
@@ -438,11 +443,52 @@ export class AudioManager {
 
     _onHealthChanged({ hp, maxHp }) {
         const frac = hp / maxHp;
+        const wasLow = this._lowHp;
+
         if (frac < 0.25 && !this._lowHp) {
             this._lowHp = true;
         } else if (frac >= 0.25 && this._lowHp) {
             this._lowHp = false;
         }
+
+        if (!FeatureFlags.LOW_HEALTH_HEARTBEAT) return;
+
+        if (this._lowHp && !wasLow) {
+            // Just dropped below 25% — start heartbeat
+            this._startHeartbeat(frac < 0.10);
+        } else if (!this._lowHp && wasLow) {
+            // Recovered above 25% — stop heartbeat
+            this._stopHeartbeat();
+        } else if (this._lowHp) {
+            // Already in low-HP state — switch between warning/critical
+            const isCritical = frac < 0.10;
+            if (isCritical !== this._heartbeatCritical) {
+                this._stopHeartbeat();
+                this._startHeartbeat(isCritical);
+            }
+        }
+    }
+
+    _startHeartbeat(critical = false) {
+        this._stopHeartbeat();
+        const key = critical ? 'announcer_health_critical' : 'announcer_health_warning';
+        if (!this.scene.cache.audio.exists(key)) return;
+
+        this._heartbeatCritical = critical;
+        this._heartbeatSound = this.sound.add(key, {
+            loop: true,
+            volume: (critical ? 0.7 : 0.5) * this.masterSFXVolume,
+        });
+        this._heartbeatSound.play();
+    }
+
+    _stopHeartbeat() {
+        if (this._heartbeatSound) {
+            this._heartbeatSound.stop();
+            this._heartbeatSound.destroy();
+            this._heartbeatSound = null;
+        }
+        this._heartbeatCritical = false;
     }
 
     // ── SFX Event Handlers ────────────────────────────────────────────────
@@ -485,6 +531,8 @@ export class AudioManager {
         if (this.state === 'combat') {
             this.exitCombat();
         }
+        this._stopHeartbeat();
+        this._lowHp = false;
     }
 
     /**
@@ -519,5 +567,6 @@ export class AudioManager {
         this._stopBiomeTrack();
         this._stopBossTheme();
         this._stopStandalone();
+        this._stopHeartbeat();
     }
 }

@@ -49,6 +49,14 @@ export const Events = {
     GAME_VICTORY: 'game:victory',
     AUTO_SAVE: 'game:autoSave',
 
+    // Weapons
+    WEAPON_SWAPPED: 'weapon:swapped',
+    WEAPON_LEVELED_UP: 'weapon:leveledUp',
+    WEAPON_PERK_UNLOCKED: 'weapon:perkUnlocked',
+
+    // Boss
+    BOSS_DEFEATED: 'boss:defeated',
+
     // Secrets (Phase 4)
     SECRET_FOUND: 'secret:found',
 

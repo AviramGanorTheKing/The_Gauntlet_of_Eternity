@@ -275,8 +275,12 @@ export class MoralChoiceSystem {
                 break;
             case 'sacrifice':
                 // Sacrifice best equipment
+                if (player.weapons) {
+                    player.weapons = [null, null];
+                    player.activeWeaponIndex = 0;
+                    player._recalcWeaponStats();
+                }
                 if (player.gear) {
-                    player.gear.weapon = null;
                     player.gear.armor = null;
                 }
                 this._showChoiceResult('Your companion rises. Your sacrifice is remembered.');

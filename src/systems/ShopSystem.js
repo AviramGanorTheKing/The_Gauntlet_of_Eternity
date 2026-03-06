@@ -199,9 +199,14 @@ export class ShopSystem {
                 break;
             case 'gear':
                 if (item.gear) {
-                    const slot = item.gear.slot;
-                    player.gear[slot] = item.gear;
-                    EventBus.emit(Events.GEAR_EQUIPPED, { item: item.gear, slot });
+                    if (item.gear.slot === 'weapon') {
+                        // Use LootSystem equip logic for dual-weapon support
+                        this.scene.lootSystem?.tryEquipGear(player, item.gear);
+                    } else {
+                        const slot = item.gear.slot;
+                        player.gear[slot] = item.gear;
+                        EventBus.emit(Events.GEAR_EQUIPPED, { item: item.gear, slot });
+                    }
                 }
                 break;
         }

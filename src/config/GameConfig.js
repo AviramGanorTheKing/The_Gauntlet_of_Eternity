@@ -63,6 +63,12 @@ export const GameConfig = {
     TRAPS_PER_FLOOR: [2, 5],    // min, max
     SHRINES_PER_FLOOR: [1, 2],  // min, max
 
+    // Weapon progression
+    WEAPON_XP_PER_KILL: 10,
+    WEAPON_XP_PER_KILL_ELITE: 25,
+    WEAPON_XP_PER_KILL_BOSS: 100,
+    WEAPON_SWAP_COOLDOWN: 300,  // ms
+
     // Test room
     TEST_ROOM_WIDTH: 20,
     TEST_ROOM_HEIGHT: 15,

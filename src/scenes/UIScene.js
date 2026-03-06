@@ -1,5 +1,6 @@
 import { EventBus, Events } from '../utils/EventBus.js';
 import { StatusEffectData } from '../config/StatusEffectData.js';
+import { RARITY_COLORS } from '../config/GearData.js';
 
 /**
  * UIScene — runs in parallel above GameScene.
@@ -235,16 +236,46 @@ export class UIScene extends Phaser.Scene {
             color: '#00ff88', stroke: '#000', strokeThickness: 2
         }).setDepth(300);
 
-        // Gear strip (small text near bottom-left)
+        // ── Dual Weapon Display (above potions) ─────────────────────────
+        const weaponY = BL_Y - 36;
+        this.weapon1Text = this.add.text(BL_X, weaponY, '[1] —', {
+            fontFamily: 'monospace', fontSize: '9px',
+            color: '#ffffff', stroke: '#000', strokeThickness: 2
+        }).setDepth(300);
+        this.weapon2Text = this.add.text(BL_X + 130, weaponY, '[2] —', {
+            fontFamily: 'monospace', fontSize: '9px',
+            color: '#888888', stroke: '#000', strokeThickness: 2
+        }).setDepth(300);
+
+        // XP bars (small block bars under weapon names)
+        this.weaponXPGfx = this.add.graphics().setDepth(300);
+        this._weaponXPBarY = weaponY + 14;
+
+        // Armor + accessory line
         this.gearText = this.add.text(BL_X, BL_Y - 16, '', {
             fontFamily: 'monospace', fontSize: '8px',
             color: '#cccccc', stroke: '#000', strokeThickness: 2
         }).setDepth(300);
 
+        // Level-up notification (centered, hidden by default)
+        this._weaponLevelUpText = this.add.text(W / 2, H / 2 - 40, '', {
+            fontFamily: 'monospace', fontSize: '16px',
+            color: '#ffcc00', stroke: '#000', strokeThickness: 3,
+            fontStyle: 'bold'
+        }).setOrigin(0.5).setDepth(400).setVisible(false);
+
+        this._weaponPerkText = this.add.text(W / 2, H / 2 - 18, '', {
+            fontFamily: 'monospace', fontSize: '11px',
+            color: '#88ff88', stroke: '#000', strokeThickness: 2
+        }).setOrigin(0.5).setDepth(400).setVisible(false);
+
         // ── EventBus ─────────────────────────────────────────────────────
         EventBus.on(Events.GOLD_CHANGED, this._onGoldChanged, this);
         EventBus.on(Events.GEAR_EQUIPPED, this._onGearEquipped, this);
         EventBus.on(Events.POTION_PICKED_UP, this._onPotionPickedUp, this);
+        EventBus.on(Events.WEAPON_SWAPPED, this._onWeaponSwapped, this);
+        EventBus.on(Events.WEAPON_LEVELED_UP, this._onWeaponLeveledUp, this);
+        EventBus.on(Events.WEAPON_PERK_UNLOCKED, this._onWeaponPerkUnlocked, this);
 
         this._fullRedraw();
     }
@@ -334,6 +365,9 @@ export class UIScene extends Phaser.Scene {
 
         // Status effects
         this._updateStatusStrip(gameScene, player);
+
+        // Weapon XP bars (lightweight redraw)
+        this._drawWeaponXPBars(player);
 
         // Minimap (every 250ms or on floor change)
         this._mmUpdateTimer += delta;
@@ -766,13 +800,103 @@ export class UIScene extends Phaser.Scene {
         if (type === 'mana') this.mpPotLabel?.setText(`${count}`);
     }
 
+    _onWeaponSwapped() {
+        const player = this.scene.get('GameScene')?.player;
+        if (player) this._refreshGearText(player);
+    }
+
+    _onWeaponLeveledUp({ weapon, level }) {
+        this._weaponLevelUpText.setText(`${weapon.name} reached Lv.${level}!`);
+        this._weaponLevelUpText.setVisible(true).setAlpha(1);
+        this.tweens.killTweensOf(this._weaponLevelUpText);
+        this.tweens.add({
+            targets: this._weaponLevelUpText,
+            alpha: 0, y: this._weaponLevelUpText.y - 20,
+            delay: 1200, duration: 500,
+            onComplete: () => {
+                this._weaponLevelUpText.setVisible(false);
+                this._weaponLevelUpText.y += 20;
+            }
+        });
+        // Refresh weapon display
+        const player = this.scene.get('GameScene')?.player;
+        if (player) this._refreshGearText(player);
+    }
+
+    _onWeaponPerkUnlocked({ weapon, perk }) {
+        this._weaponPerkText.setText(`${perk.name} unlocked! (${perk.desc})`);
+        this._weaponPerkText.setVisible(true).setAlpha(1);
+        this.tweens.killTweensOf(this._weaponPerkText);
+        this.tweens.add({
+            targets: this._weaponPerkText,
+            alpha: 0,
+            delay: 1800, duration: 500,
+            onComplete: () => this._weaponPerkText.setVisible(false)
+        });
+    }
+
     _refreshGearText(player) {
-        if (!player?.gear) return;
-        const g = player.gear;
-        const w = g.weapon ? `${g.weapon.name}` : '—';
+        if (!player) return;
+
+        // Dual weapon display
+        const w0 = player.weapons[0];
+        const w1 = player.weapons[1];
+        const active = player.activeWeaponIndex;
+
+        const fmt = (w, idx) => {
+            if (!w) return `[${idx + 1}] —`;
+            return `[${idx + 1}] ${w.name} Lv.${w.level || 1}`;
+        };
+
+        this.weapon1Text?.setText(fmt(w0, 0));
+        this.weapon2Text?.setText(fmt(w1, 1));
+
+        // Highlight active weapon
+        const activeColor = '#ffffff';
+        const inactiveColor = '#666666';
+        this.weapon1Text?.setColor(active === 0 ? activeColor : inactiveColor);
+        this.weapon2Text?.setColor(active === 1 ? activeColor : inactiveColor);
+
+        // Weapon XP bars
+        this._drawWeaponXPBars(player);
+
+        // Armor + accessory
+        const g = player.gear || {};
         const a = g.armor ? `${g.armor.name}` : '—';
         const r = g.accessory ? `${g.accessory.name}` : '—';
-        this.gearText?.setText(`⚔${w}  🛡${a}  💍${r}`);
+        this.gearText?.setText(`🛡${a}  💍${r}`);
+    }
+
+    _drawWeaponXPBars(player) {
+        const gfx = this.weaponXPGfx;
+        if (!gfx) return;
+        gfx.clear();
+
+        const BL_X = 12;
+        const y = this._weaponXPBarY;
+        const barW = 60;
+        const barH = 3;
+
+        for (let i = 0; i < 2; i++) {
+            const weapon = player.weapons[i];
+            const x = BL_X + i * 130;
+
+            if (!weapon) continue;
+
+            const maxLevel = weapon.maxLevel || 5;
+            const isMaxed = weapon.level >= maxLevel;
+            const xpThreshold = weapon.xpCurve?.[weapon.level] ?? 50 * weapon.level;
+            const frac = isMaxed ? 1 : Phaser.Math.Clamp(weapon.xp / xpThreshold, 0, 1);
+
+            // Background
+            gfx.fillStyle(0x222233, 0.8);
+            gfx.fillRect(x, y, barW, barH);
+
+            // Fill
+            const color = isMaxed ? 0xffcc00 : (RARITY_COLORS[weapon.rarity] || 0x44cc44);
+            gfx.fillStyle(color, 1);
+            gfx.fillRect(x, y, Math.round(barW * frac), barH);
+        }
     }
 
     // ── Low HP Warning ──────────────────────────────────────────────────────
@@ -826,6 +950,9 @@ export class UIScene extends Phaser.Scene {
         EventBus.off(Events.GOLD_CHANGED, this._onGoldChanged, this);
         EventBus.off(Events.GEAR_EQUIPPED, this._onGearEquipped, this);
         EventBus.off(Events.POTION_PICKED_UP, this._onPotionPickedUp, this);
+        EventBus.off(Events.WEAPON_SWAPPED, this._onWeaponSwapped, this);
+        EventBus.off(Events.WEAPON_LEVELED_UP, this._onWeaponLeveledUp, this);
+        EventBus.off(Events.WEAPON_PERK_UNLOCKED, this._onWeaponPerkUnlocked, this);
         for (const lbl of this._statusPool) {
             if (lbl.active) lbl.destroy();
         }

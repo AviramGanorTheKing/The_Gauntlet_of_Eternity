@@ -78,9 +78,8 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         this.attackTimers = [];
         this._initPhaseTimers();
 
-        // PERFORMANCE: Track active update listeners and delayed calls for cleanup
+        // PERFORMANCE: Track active update listeners and graphics for cleanup
         this._activeUpdateListeners = [];
-        this._activeDelayedCalls = [];
         this._activeGraphics = [];
 
         // Telegraph indicator
@@ -187,7 +186,7 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         if (this._telegraphGfx?.active) this._telegraphGfx.destroy();
         if (this._nameText?.active) this._nameText.destroy();
 
-        EventBus.emit('BOSS_DEFEATED', {
+        EventBus.emit(Events.BOSS_DEFEATED, {
             boss: this,
             key: this.bossData.key,
             reward: this.bossData.reward
@@ -861,27 +860,20 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     }
 
     /**
-     * PERFORMANCE: Clean up all tracked update listeners, delayed calls, and graphics.
+     * PERFORMANCE: Clean up all tracked update listeners and graphics.
      * Called from die() and destroy() to prevent memory leaks.
      */
     _cleanupTrackedResources() {
         const scene = this.scene;
-        if (!scene) return;
 
         // Remove all tracked update listeners
         if (this._activeUpdateListeners) {
-            for (const listener of this._activeUpdateListeners) {
-                scene.events.off('update', listener);
+            if (scene) {
+                for (const listener of this._activeUpdateListeners) {
+                    scene.events.off('update', listener);
+                }
             }
             this._activeUpdateListeners = [];
-        }
-
-        // Cancel all tracked delayed calls
-        if (this._activeDelayedCalls) {
-            for (const call of this._activeDelayedCalls) {
-                if (call && call.remove) call.remove();
-            }
-            this._activeDelayedCalls = [];
         }
 
         // Destroy all tracked graphics
@@ -909,15 +901,6 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         if (this._activeUpdateListeners) {
             const idx = this._activeUpdateListeners.indexOf(listener);
             if (idx !== -1) this._activeUpdateListeners.splice(idx, 1);
-        }
-    }
-
-    /**
-     * Helper to track a delayed call for later cleanup.
-     */
-    _trackDelayedCall(call) {
-        if (this._activeDelayedCalls) {
-            this._activeDelayedCalls.push(call);
         }
     }
 

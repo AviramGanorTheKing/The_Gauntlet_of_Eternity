@@ -251,7 +251,8 @@ export class SaveManager {
             hp: null, // filled on first save
             mana: null,
             gold: 0,
-            gear: { weapon: null, armor: null, accessory: null },
+            gear: { armor: null, accessory: null },
+            weapons: [null, null],
             hpPotions: 6,
             mpPotions: 4,
             companionStates: [],

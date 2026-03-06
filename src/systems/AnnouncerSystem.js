@@ -110,7 +110,7 @@ export class AnnouncerSystem {
         EventBus.on(Events.ENEMY_DIED, this._onEnemyDied, this);
         EventBus.on(Events.SECRET_FOUND, this._onSecretFound, this);
         EventBus.on(Events.SHRINE_ACTIVATED, this._onShrine, this);
-        EventBus.on('BOSS_DEFEATED', this._onBossDefeated, this);
+        EventBus.on(Events.BOSS_DEFEATED, this._onBossDefeated, this);
 
         this._killStreak = 0;
         this._killStreakTimer = null;
@@ -315,7 +315,7 @@ export class AnnouncerSystem {
         EventBus.off(Events.ENEMY_DIED, this._onEnemyDied, this);
         EventBus.off(Events.SECRET_FOUND, this._onSecretFound, this);
         EventBus.off(Events.SHRINE_ACTIVATED, this._onShrine, this);
-        EventBus.off('BOSS_DEFEATED', this._onBossDefeated, this);
+        EventBus.off(Events.BOSS_DEFEATED, this._onBossDefeated, this);
 
         this._stopCurrent();
         if (this._killStreakTimer) clearTimeout(this._killStreakTimer);

@@ -106,6 +106,11 @@ export class LootSystem {
      * Auto-equip gear if it's better than what's currently equipped.
      */
     tryEquipGear(player, item) {
+        if (item.slot === 'weapon') {
+            this._tryEquipWeapon(player, item);
+            return;
+        }
+
         const slot = item.slot;
         const current = player.gear[slot];
 
@@ -121,6 +126,36 @@ export class LootSystem {
             this.applyGearStats(player, item);
 
             EventBus.emit(Events.GEAR_EQUIPPED, { player, item, slot });
+        }
+    }
+
+    /**
+     * Dual-weapon equip logic: fill empty slot, then replace inactive if better.
+     */
+    _tryEquipWeapon(player, item) {
+        // Fill empty slots first
+        if (!player.weapons[0]) {
+            player.weapons[0] = item;
+            player.activeWeaponIndex = 0;
+            player._recalcWeaponStats();
+            EventBus.emit(Events.GEAR_EQUIPPED, { player, item, slot: 'weapon', weaponIndex: 0 });
+            return;
+        }
+        if (!player.weapons[1]) {
+            player.weapons[1] = item;
+            EventBus.emit(Events.GEAR_EQUIPPED, { player, item, slot: 'weapon', weaponIndex: 1 });
+            return;
+        }
+
+        // Both slots full — replace inactive weapon if new is better
+        const inactiveIdx = player.activeWeaponIndex === 0 ? 1 : 0;
+        const inactive = player.weapons[inactiveIdx];
+        const isBetter = item.rarity > inactive.rarity ||
+            (item.attack || 0) > (inactive.attack || 0);
+
+        if (isBetter) {
+            player.weapons[inactiveIdx] = item;
+            EventBus.emit(Events.GEAR_EQUIPPED, { player, item, slot: 'weapon', weaponIndex: inactiveIdx });
         }
     }
 

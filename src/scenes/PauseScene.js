@@ -13,6 +13,7 @@
 import { applyCRTShader } from '../shaders/CRTShader.js';
 import { ClassData } from '../config/ClassData.js';
 import { RARITY_COLORS } from '../utils/Constants.js';
+import { RARITY_NAMES } from '../config/GearData.js';
 import { LoreData } from '../config/LoreData.js';
 
 const TAB_KEYS = ['INVENTORY', 'MAP', 'CODEX', 'STATS', 'SETTINGS'];
@@ -185,10 +186,17 @@ export class PauseScene extends Phaser.Scene {
 
     _buildInventoryTab(contentY, contentH) {
         const items = [];
-        const gear = this.playerData.gear || {};
-        const slots = ['weapon', 'armor', 'accessory'];
-        const slotLabels = { weapon: 'WEAPON', armor: 'ARMOR', accessory: 'ACCESSORY' };
-        const slotIcons = { weapon: '⚔', armor: '🛡', accessory: '💍' };
+        const player = this.playerData;
+        // Build combined gear view: weapons from player.weapons, rest from player.gear
+        const gear = {
+            weapon1: player.weapons?.[0] || null,
+            weapon2: player.weapons?.[1] || null,
+            armor: player.gear?.armor || null,
+            accessory: player.gear?.accessory || null,
+        };
+        const slots = ['weapon1', 'weapon2', 'armor', 'accessory'];
+        const slotLabels = { weapon1: 'WEAPON 1', weapon2: 'WEAPON 2', armor: 'ARMOR', accessory: 'ACCESSORY' };
+        const slotIcons = { weapon1: '⚔', weapon2: '⚔', armor: '🛡', accessory: '💍' };
         const pw = this._panelW;
 
         // Column layout
@@ -215,12 +223,12 @@ export class PauseScene extends Phaser.Scene {
         const eqX = colX + 175;
 
         slots.forEach((slot, i) => {
-            const sy = contentY + 10 + i * 90;
+            const sy = contentY + 6 + i * 68;
             const item = gear[slot];
 
             // Slot label
             const label = this.add.text(eqX, sy, `${slotIcons[slot]} ${slotLabels[slot]}`, {
-                fontFamily: 'monospace', fontSize: '10px', color: '#667788',
+                fontFamily: 'monospace', fontSize: '9px', color: '#667788',
             });
             this._panelContainer.add(label);
             items.push(label);
@@ -228,43 +236,49 @@ export class PauseScene extends Phaser.Scene {
             // Slot background
             const slotBg = this.add.graphics();
             slotBg.fillStyle(0x0a0a1a, 0.8);
-            slotBg.fillRoundedRect(eqX, sy + 16, 350, 60, 4);
+            slotBg.fillRoundedRect(eqX, sy + 13, 350, 46, 4);
             slotBg.lineStyle(1, 0x334466, 0.5);
-            slotBg.strokeRoundedRect(eqX, sy + 16, 350, 60, 4);
+            slotBg.strokeRoundedRect(eqX, sy + 13, 350, 46, 4);
             this._panelContainer.add(slotBg);
             items.push(slotBg);
 
             if (item) {
                 const rarityColor = RARITY_COLORS[item.rarity] || 0xffffff;
                 const colorStr = '#' + rarityColor.toString(16).padStart(6, '0');
+                const rarityName = item.rarityName || RARITY_NAMES[item.rarity] || 'Common';
 
-                const nameText = this.add.text(eqX + 10, sy + 22, item.name || `${item.rarity} ${slot}`, {
-                    fontFamily: 'monospace', fontSize: '12px',
+                // Name + level for weapons
+                let displayName = item.name || slot;
+                if ((slot === 'weapon1' || slot === 'weapon2') && item.level) {
+                    displayName += ` Lv.${item.level}`;
+                }
+
+                const nameText = this.add.text(eqX + 10, sy + 18, displayName, {
+                    fontFamily: 'monospace', fontSize: '11px',
                     color: colorStr, stroke: '#000', strokeThickness: 1,
                 });
                 this._panelContainer.add(nameText);
                 items.push(nameText);
 
                 // Rarity tag
-                const rarityTag = this.add.text(eqX + 10, sy + 40, `[${(item.rarity || 'common').toUpperCase()}]`, {
+                const rarityTag = this.add.text(eqX + 10, sy + 34, `[${rarityName.toUpperCase()}]`, {
                     fontFamily: 'monospace', fontSize: '8px', color: colorStr,
                 });
                 this._panelContainer.add(rarityTag);
                 items.push(rarityTag);
 
-                // Stat bonuses in green
-                if (item.statBonus) {
-                    const bonusStr = Object.entries(item.statBonus)
-                        .map(([k, v]) => `+${v} ${k}`).join('  ');
-                    const bonusText = this.add.text(eqX + 10, sy + 54, bonusStr, {
-                        fontFamily: 'monospace', fontSize: '9px', color: '#66cc66',
+                // Properties in green
+                if (item.properties?.length) {
+                    const propStr = item.properties.map(p => p.label).join(' | ');
+                    const propText = this.add.text(eqX + 10, sy + 46, propStr, {
+                        fontFamily: 'monospace', fontSize: '8px', color: '#66cc66',
                     });
-                    this._panelContainer.add(bonusText);
-                    items.push(bonusText);
+                    this._panelContainer.add(propText);
+                    items.push(propText);
                 }
             } else {
-                const emptyText = this.add.text(eqX + 10, sy + 34, '(empty)', {
-                    fontFamily: 'monospace', fontSize: '11px', color: '#444444',
+                const emptyText = this.add.text(eqX + 10, sy + 28, '(empty)', {
+                    fontFamily: 'monospace', fontSize: '10px', color: '#444444',
                 });
                 this._panelContainer.add(emptyText);
                 items.push(emptyText);
@@ -672,11 +686,18 @@ export class PauseScene extends Phaser.Scene {
     }
 
     _calcGearBonuses() {
-        const gear = this.playerData.gear || {};
+        const player = this.playerData;
+        const gear = player.gear || {};
         const bonuses = { attack: 0, defense: 0, hp: 0 };
 
-        for (const slot of ['weapon', 'armor', 'accessory']) {
-            const item = gear[slot];
+        // Include both weapons and armor/accessory
+        const allItems = [
+            player.weapons?.[player.activeWeaponIndex],
+            gear.armor,
+            gear.accessory,
+        ];
+
+        for (const item of allItems) {
             if (item?.statBonus) {
                 for (const [key, val] of Object.entries(item.statBonus)) {
                     if (bonuses[key] !== undefined) bonuses[key] += val;

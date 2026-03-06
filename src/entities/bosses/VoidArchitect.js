@@ -59,6 +59,7 @@ export class VoidArchitect extends Boss {
 
         this.scene.cameras.main.flash(150, 100, 0, 255);
 
+        const boss = this;
         const targetX = this.x;
         const targetY = this.y;
         const startX = this.target.x;
@@ -66,17 +67,25 @@ export class VoidArchitect extends Boss {
 
         let elapsed = 0;
         const duration = 500;
+
+        const cleanup = () => {
+            this.scene?.events.off('update', pullUpdate);
+            this._untrackUpdateListener(pullUpdate);
+        };
+
         const pullUpdate = (time, delta) => {
+            if (!boss.alive) { cleanup(); return; }
             elapsed += delta;
             const t = Math.min(elapsed / duration, 1);
             // Lerp player 40% toward boss center
             this.target.x = Phaser.Math.Linear(startX, targetX, t * 0.4);
             this.target.y = Phaser.Math.Linear(startY, targetY, t * 0.4);
             if (elapsed >= duration) {
-                this.scene.events.off('update', pullUpdate);
+                cleanup();
             }
         };
         this.scene.events.on('update', pullUpdate);
+        this._trackUpdateListener(pullUpdate);
     }
 
     _deathEffect() {

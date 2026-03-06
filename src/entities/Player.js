@@ -54,8 +54,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         this.hpPotions = 0;
         this.mpPotions = 0;
 
-        // Gear slots (weapon, armor, accessory) — null = empty
-        this.gear = { weapon: null, armor: null, accessory: null };
+        // Gear slots (armor, accessory) — null = empty
+        this.gear = { armor: null, accessory: null };
+
+        // Dual weapon slots (primary + secondary)
+        this.weapons = [null, null];
+        this.activeWeaponIndex = 0;
+        this.weaponSwapCooldown = 0;
 
         // ── State ───────────────────────────────────────────────────────
         this.state = ENTITY_STATES.IDLE;
@@ -160,6 +165,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         this.aimIndicator.y = this.y + Math.sin(this.facingAngle) * indicatorDist;
         this.aimIndicator.setRotation(this.facingAngle);
 
+        // ── Weapon swap ────────────────────────────────────────────────
+        const swapTo = this.inputSource.getWeaponSwap();
+        if (swapTo > 0 && this.weaponSwapCooldown <= 0) {
+            this.swapWeapon(swapTo - 1);
+        }
+        if (this.weaponSwapCooldown > 0) this.weaponSwapCooldown -= delta;
+
         // ── Attack ──────────────────────────────────────────────────────
         if (this.inputSource.isAttackPressed() && this.attackCooldownTimer <= 0 && !this.isAttacking) {
             this.performAttack();
@@ -194,14 +206,86 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         EventBus.emit(Events.PLAYER_ATTACK, {
             player: this,
             angle: this.facingAngle,
-            attackData: this.classData.attackStyle,
+            attackData: this.getActiveAttackStyle(),
             attackPower: this.attackPower,
+            weapon: this.weapons[this.activeWeaponIndex],
         });
 
         this.scene.time.delayedCall(200, () => {
             this.isAttacking = false;
             if (this.state === ENTITY_STATES.ATTACKING) this.state = ENTITY_STATES.IDLE;
         });
+    }
+
+    // ── Weapon System ────────────────────────────────────────────────────────
+
+    /** Returns the active weapon's attackStyle with level/perk bonuses, or class default. */
+    getActiveAttackStyle() {
+        const weapon = this.weapons[this.activeWeaponIndex];
+        if (!weapon?.attackStyle) return this.classData.attackStyle;
+
+        const style = { ...weapon.attackStyle };
+
+        // Apply cumulative level bonuses
+        if (weapon.level > 1 && weapon.levelBonuses) {
+            const levels = weapon.level - 1;
+            for (const [stat, perLevel] of Object.entries(weapon.levelBonuses)) {
+                if (stat in style && typeof style[stat] === 'number') {
+                    style[stat] += perLevel * levels;
+                }
+            }
+        }
+
+        // Apply unlocked perk effects that modify attackStyle
+        for (const perkId of weapon.unlockedPerks || []) {
+            const perkDef = weapon.perks?.find(p => p.id === perkId);
+            if (!perkDef?.effect) continue;
+            for (const [key, val] of Object.entries(perkDef.effect)) {
+                if (key in style && typeof val === 'number') {
+                    style[key] += val;
+                } else {
+                    style[key] = val;
+                }
+            }
+        }
+
+        return style;
+    }
+
+    /** Switch to the weapon at the given index (0 or 1). */
+    swapWeapon(index) {
+        if (index === this.activeWeaponIndex) return;
+        if (!this.weapons[index]) return;
+
+        this.activeWeaponIndex = index;
+        this.weaponSwapCooldown = GameConfig.WEAPON_SWAP_COOLDOWN;
+        this._recalcWeaponStats();
+
+        EventBus.emit(Events.WEAPON_SWAPPED, {
+            player: this,
+            activeIndex: index,
+            weapon: this.weapons[index],
+        });
+    }
+
+    /** Recalculate attackPower and cooldown from the active weapon. */
+    _recalcWeaponStats() {
+        const weapon = this.weapons[this.activeWeaponIndex];
+        this.attackPower = this.classData.attack;
+        if (weapon?.attack) {
+            // Add weapon attack plus level bonuses
+            let bonus = weapon.attack;
+            if (weapon.level > 1 && weapon.levelBonuses?.attack) {
+                bonus += weapon.levelBonuses.attack * (weapon.level - 1);
+            }
+            this.attackPower += bonus;
+        }
+
+        // Attack speed multiplier from weapon perks
+        let speedMult = 1.0;
+        const style = this.getActiveAttackStyle();
+        if (style.attackSpeedMult) speedMult = style.attackSpeedMult;
+        this.attackCooldownDuration = 1000 / (this.attackSpeedRate * speedMult);
     }
 
     // ── Dodge ─────────────────────────────────────────────────────────────────
@@ -379,6 +463,7 @@ export class InputSource {
     isSpecialPressed() { return false; }
     isPotionPressed() { return false; }
     isMPotionPressed() { return false; }
+    getWeaponSwap() { return 0; }
 }
 
 export class KeyboardMouseInput extends InputSource {
@@ -396,6 +481,8 @@ export class KeyboardMouseInput extends InputSource {
             special: Phaser.Input.Keyboard.KeyCodes.E,
             potion: Phaser.Input.Keyboard.KeyCodes.Q,
             mpotion: Phaser.Input.Keyboard.KeyCodes.R,
+            weapon1: Phaser.Input.Keyboard.KeyCodes.ONE,
+            weapon2: Phaser.Input.Keyboard.KeyCodes.TWO,
         });
 
         // Aim mode: 'mouse' (default) or 'movement'
@@ -486,4 +573,10 @@ export class KeyboardMouseInput extends InputSource {
     isSpecialPressed() { return Phaser.Input.Keyboard.JustDown(this.keys.special); }
     isPotionPressed() { return Phaser.Input.Keyboard.JustDown(this.keys.potion); }
     isMPotionPressed() { return Phaser.Input.Keyboard.JustDown(this.keys.mpotion); }
+
+    getWeaponSwap() {
+        if (Phaser.Input.Keyboard.JustDown(this.keys.weapon1)) return 1;
+        if (Phaser.Input.Keyboard.JustDown(this.keys.weapon2)) return 2;
+        return 0;
+    }
 }

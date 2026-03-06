@@ -8,7 +8,7 @@
 
 import { PerkData, PerkLookup, RESPEC_COSTS } from '../config/PerkData.js';
 import { saveManager } from './SaveManager.js';
-import { EventBus } from '../utils/EventBus.js';
+import { EventBus, Events } from '../utils/EventBus.js';
 
 /** Soul shard earning rates (per GDD section 4) */
 const SHARD_RATES = {
@@ -347,7 +347,7 @@ export class ProgressionManager {
 
     _setupListeners() {
         EventBus.on('room:cleared', () => this.awardShards('room_cleared'));
-        EventBus.on('BOSS_DEFEATED', (data) => {
+        EventBus.on(Events.BOSS_DEFEATED, (data) => {
             this.awardShards('boss_defeated', data?.floor);
         });
         EventBus.on('shrine:activated', () => this.awardShards('shrine_completed'));
@@ -355,7 +355,7 @@ export class ProgressionManager {
 
     destroy() {
         EventBus.off('room:cleared');
-        EventBus.off('BOSS_DEFEATED');
+        EventBus.off(Events.BOSS_DEFEATED);
         EventBus.off('shrine:activated');
     }
 }

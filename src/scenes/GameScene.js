@@ -21,6 +21,7 @@ import { CombatSystem } from '../systems/CombatSystem.js';
 import { DungeonManager } from '../systems/DungeonManager.js';
 import { FogOfWar } from '../systems/FogOfWar.js';
 import { LootSystem } from '../systems/LootSystem.js';
+import { WeaponXPSystem } from '../systems/WeaponXPSystem.js';
 import { StatusEffects } from '../systems/StatusEffects.js';
 import { TrapSystem } from '../systems/TrapSystem.js';
 import { ShrineSystem } from '../systems/ShrineSystem.js';
@@ -121,6 +122,7 @@ export class GameScene extends Phaser.Scene {
         this.combatSystem = new CombatSystem(this);
         this.statusEffects = new StatusEffects(this);
         this.lootSystem = new LootSystem(this);
+        this.weaponXPSystem = new WeaponXPSystem(this);
         this.trapSystem = new TrapSystem(this);
         this.shrineSystem = new ShrineSystem(this);
         this.shrineSystem.init();
@@ -159,7 +161,7 @@ export class GameScene extends Phaser.Scene {
         EventBus.on(Events.ENEMY_DIED, this.onEnemyDied, this);
         EventBus.on(Events.PLAYER_DEATH, this.onPlayerDeath, this);
         EventBus.on(Events.ENEMY_SPAWNED, this.onEnemySpawned, this);
-        EventBus.on('BOSS_DEFEATED', this.onBossDefeated, this);
+        EventBus.on(Events.BOSS_DEFEATED, this.onBossDefeated, this);
         EventBus.on(Events.PLAYER_ATTACK, this.onPlayerAttackSpawners, this);
 
         // ESC to pause
@@ -1389,12 +1391,14 @@ export class GameScene extends Phaser.Scene {
         EventBus.off(Events.ENEMY_SPAWNED, this.onEnemySpawned, this);
         EventBus.off(Events.PLAYER_DEATH, this.onPlayerDeath, this);
         EventBus.off(Events.PLAYER_ATTACK, this.onPlayerAttackSpawners, this);
+        EventBus.off(Events.BOSS_DEFEATED, this.onBossDefeated, this);
 
         if (this._hpBarGfx) this._hpBarGfx.destroy();
         this.combatSystem?.destroy();
         this.dungeonManager?.destroy();
         this.fogOfWar?.destroy();
         this.lootSystem?.destroy();
+        this.weaponXPSystem?.destroy();
         this.statusEffects?.destroy();
         this.trapSystem?.destroy();
         this.shrineSystem?.destroy();

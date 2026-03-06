@@ -1,4 +1,4 @@
-# Changelog
+ # Changelog
 
 All notable changes to **The Gauntlet of Eternity** will be documented in this file.
 
@@ -7,6 +7,32 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ---
 
 ## [Unreleased]
+
+### Added
+- **Dual Weapon System**: Players carry two weapons and swap with 1/2 keys
+  - Each weapon type has distinct attack behavior (range, arc, speed, knockback)
+  - Auto-equip fills empty slots first, then replaces inactive weapon if better
+  - 300ms swap cooldown prevents spam
+- **Weapon XP & Leveling**: Weapons gain XP from kills and level up during a run
+  - 5 levels per weapon (XP thresholds: 50/150/350/700)
+  - XP per kill: 10 normal, 25 elite, 100 boss
+  - Per-run only — lost on death
+- **Weapon Perks**: 2 unique perks per weapon type, unlocking at levels 2 and 4
+  - Examples: Sword gets Wide Sweep (+20 arc) at Lv.2, Long Blade (+8 range) at Lv.4
+- **Valkyrie Weapons**: Spear (narrow thrust), Halberd (wide arc), Lance (long reach)
+- **Necromancer Weapons**: Scythe (cone), Cursed Tome (piercing projectile), Bone Wand (homing)
+- **New Combat Mechanics**: MultiShot (angular spread), Homing projectiles, Stun Chance on melee/cone hits
+- **Weapon HUD**: Dual weapon display with XP bars, active highlight, level-up and perk-unlock notifications
+
+### Changed
+- Weapons moved from `gear.weapon` to dedicated `weapons[0,1]` array on Player
+- Attack behavior now driven by equipped weapon's `attackStyle` instead of fixed class data
+- Pause menu inventory shows both weapon slots with level and rarity
+- Shop weapon purchases route through dual-weapon equip logic
+- Moral choice "sacrifice" clears both weapon slots
+
+### Fixed
+- **Pause menu inventory crash**: Rarity display called `.toUpperCase()` on a number; now uses `rarityName` string
 
 ### Performance
 - **Boss attack listener cleanup**: All boss attack methods (projectile, homing, beam, spin, aoe_zone, cone_breath, gravity_well) now properly track and clean up their update listeners when the boss dies or scene shuts down

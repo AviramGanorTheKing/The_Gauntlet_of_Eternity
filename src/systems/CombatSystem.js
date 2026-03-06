@@ -82,7 +82,18 @@ export class CombatSystem {
         } else if (attackData.type === 'cone') {
             this.resolveConeHit(player, angle, attackData, attackPower);
         } else if (attackData.type === 'projectile') {
-            this.firePlayerProjectile(player, angle, attackData, attackPower);
+            const shotCount = attackData.multiShot || 1;
+            if (shotCount <= 1) {
+                this.firePlayerProjectile(player, angle, attackData, attackPower);
+            } else {
+                // Spread multiple shots across ±15° per additional projectile
+                const spreadStep = Phaser.Math.DegToRad(15);
+                const totalSpread = spreadStep * (shotCount - 1);
+                const startAngle = angle - totalSpread / 2;
+                for (let i = 0; i < shotCount; i++) {
+                    this.firePlayerProjectile(player, startAngle + spreadStep * i, attackData, attackPower);
+                }
+            }
         }
     }
 
@@ -95,7 +106,8 @@ export class CombatSystem {
         const maxRange = attackData.range || 300;
         const pierces = attackData.pierces || false;
         const knockback = attackData.knockback || 0.3;
-        const combatSystem = this;
+        const homing = attackData.homing || false;
+        const homingTurnRate = 0.04; // radians per frame
 
         // Use existing 'projectile' texture as a sprite
         const proj = this.scene.add.sprite(player.x, player.y, 'projectile');
@@ -120,18 +132,18 @@ export class CombatSystem {
 
         const startX = player.x;
         const startY = player.y;
-        const vx = Math.cos(angle) * speed;
-        const vy = Math.sin(angle) * speed;
+        let currentAngle = angle;
         let elapsed = 0;
         const hitEnemies = new Set();
+        const combatSystem = this;
 
         const destroyProj = () => {
-            combatSystem.scene.events.off('update', update);
+            this.scene.events.off('update', update);
             // PERFORMANCE: Untrack the listener
-            combatSystem._untrackProjectileListener(update);
+            this._untrackProjectileListener(update);
             if (trailEmitter) {
                 trailEmitter.stop();
-                combatSystem.scene.time.delayedCall(300, () => {
+                this.scene.time.delayedCall(300, () => {
                     if (trailEmitter.active) trailEmitter.destroy();
                 });
             }
@@ -142,6 +154,31 @@ export class CombatSystem {
             if (!proj.active) return;
             elapsed += delta;
 
+            // Homing: steer toward nearest enemy
+            if (homing && combatSystem.scene.enemies) {
+                let closest = null;
+                let closestDist = Infinity;
+                for (const enemy of combatSystem.scene.enemies.getChildren()) {
+                    if (!enemy.alive || hitEnemies.has(enemy)) continue;
+                    const edx = enemy.x - proj.x;
+                    const edy = enemy.y - proj.y;
+                    const d = edx * edx + edy * edy;
+                    if (d < closestDist) { closestDist = d; closest = enemy; }
+                }
+                if (closest) {
+                    const targetAngle = Math.atan2(closest.y - proj.y, closest.x - proj.x);
+                    const diff = Phaser.Math.Angle.Wrap(targetAngle - currentAngle);
+                    if (Math.abs(diff) > homingTurnRate) {
+                        currentAngle += Math.sign(diff) * homingTurnRate;
+                    } else {
+                        currentAngle = targetAngle;
+                    }
+                    proj.setRotation(currentAngle);
+                }
+            }
+
+            const vx = Math.cos(currentAngle) * speed;
+            const vy = Math.sin(currentAngle) * speed;
             proj.x += vx * (delta / 1000);
             proj.y += vy * (delta / 1000);
 
@@ -160,14 +197,14 @@ export class CombatSystem {
             }
 
             // Enemy collision check
-            if (!combatSystem.scene.enemies) return;
-            for (const enemy of combatSystem.scene.enemies.getChildren()) {
+            if (!this.scene.enemies) return;
+            for (const enemy of this.scene.enemies.getChildren()) {
                 if (!enemy.alive || hitEnemies.has(enemy)) continue;
                 const edx = proj.x - enemy.x;
                 const edy = proj.y - enemy.y;
                 if (edx * edx + edy * edy < 16 * 16) {
                     hitEnemies.add(enemy);
-                    combatSystem.dealDamage(player, enemy, attackPower, knockback, angle);
+                    this.dealDamage(player, enemy, attackPower, knockback, angle);
 
                     if (!pierces) {
                         destroyProj();
@@ -178,15 +215,15 @@ export class CombatSystem {
 
             // Spawner collision check (before wall check — spawners may
             // occupy tiles that isWalkable() reports as non-walkable)
-            for (const spawner of (combatSystem.scene.spawners?.getChildren() || [])) {
+            for (const spawner of (this.scene.spawners?.getChildren() || [])) {
                 if (!spawner.alive) continue;
                 const sdx = proj.x - spawner.x;
                 const sdy = proj.y - spawner.y;
                 if (sdx * sdx + sdy * sdy < 20 * 20) {
                     const dmg = spawner.takeDamage(attackPower);
                     if (dmg > 0) {
-                        combatSystem.applyWhiteFlash(spawner);
-                        combatSystem.showDamageNumber(spawner.x, spawner.y, dmg);
+                        this.applyWhiteFlash(spawner);
+                        this.showDamageNumber(spawner.x, spawner.y, dmg);
                     }
                     if (!pierces) {
                         destroyProj();
@@ -197,11 +234,11 @@ export class CombatSystem {
             }
 
             // Wall collision check
-            if (combatSystem.scene.dungeonManager) {
+            if (this.scene.dungeonManager) {
                 const ts = 32;
                 const tx = (proj.x / ts) | 0;
                 const ty = (proj.y / ts) | 0;
-                if (!combatSystem.scene.dungeonManager.isWalkable(tx, ty)) {
+                if (!this.scene.dungeonManager.isWalkable(tx, ty)) {
                     destroyProj();
                     return;
                 }
@@ -253,6 +290,8 @@ export class CombatSystem {
         const py = player.y;
         const rangeSq = range * range;
 
+        const stunChance = attackData.stunChance || 0;
+
         for (let i = 0; i < enemies.length; i++) {
             const enemy = enemies[i];
             if (!enemy.alive) continue;
@@ -268,6 +307,9 @@ export class CombatSystem {
 
             if (angleDiff <= halfArc) {
                 this.dealDamage(player, enemy, attackPower, knockback, angle);
+                if (stunChance > 0 && Math.random() < stunChance) {
+                    this._applyStun(enemy);
+                }
             }
         }
     }
@@ -304,6 +346,7 @@ export class CombatSystem {
         const px = player.x;
         const py = player.y;
         const rangeSq = range * range;
+        const stunChance = attackData.stunChance || 0;
 
         for (let i = 0; i < enemies.length; i++) {
             const enemy = enemies[i];
@@ -318,6 +361,9 @@ export class CombatSystem {
 
             if (angleDiff <= halfArc) {
                 this.dealDamage(player, enemy, damage, knockback, angle);
+                if (stunChance > 0 && Math.random() < stunChance) {
+                    this._applyStun(enemy);
+                }
             }
         }
     }
@@ -453,6 +499,21 @@ export class CombatSystem {
             onComplete: () => {
                 text.setVisible(false);
                 text.setActive(false);
+            }
+        });
+    }
+
+    /** Apply a brief stun to an enemy (freeze movement for 1s). */
+    _applyStun(enemy) {
+        if (!enemy.alive || !enemy.body) return;
+        enemy.body.setVelocity(0, 0);
+        const prevSpeed = enemy.moveSpeed;
+        enemy.moveSpeed = 0;
+        enemy.setTint(0x8888ff);
+        this.scene.time.delayedCall(1000, () => {
+            if (enemy.alive) {
+                enemy.moveSpeed = prevSpeed;
+                enemy.clearTint();
             }
         });
     }

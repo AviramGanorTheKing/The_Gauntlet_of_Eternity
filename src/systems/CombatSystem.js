@@ -378,7 +378,17 @@ export class CombatSystem {
     dealDamage(source, target, baseDamage, knockbackMultiplier, angle) {
         if (!target.alive) return;
 
-        const finalDamage = target.takeDamage(baseDamage);
+        // [FEATURE: CRIT_SYSTEM] Roll crit before defence is applied
+        let isCrit = false;
+        let adjustedDamage = baseDamage;
+        if (FeatureFlags.CRIT_SYSTEM && (source.critChance || 0) > 0) {
+            if (Math.random() < source.critChance) {
+                adjustedDamage = Math.floor(baseDamage * 1.5);
+                isCrit = true;
+            }
+        }
+
+        const finalDamage = target.takeDamage(adjustedDamage);
         if (finalDamage <= 0) return;
 
         if (source.damageDealt !== undefined) {
@@ -387,14 +397,20 @@ export class CombatSystem {
 
         this.applyWhiteFlash(target);
         this.applyKnockback(target, angle, knockbackMultiplier);
-        this.showDamageNumber(target.x, target.y, finalDamage);
+        this.showDamageNumber(target.x, target.y, finalDamage, 0xffffff, { isCrit });
 
         // [FEATURE: SCREEN_SHAKE] Light shake on every enemy hit
         if (FeatureFlags.SCREEN_SHAKE) {
             this.scene.cameras.main.shake(80, 0.002);
         }
 
-        EventBus.emit(Events.ENTITY_DAMAGED, { source, target, damage: finalDamage });
+        // [FEATURE: HIT_PARTICLES] Spark burst at the point of impact
+        if (FeatureFlags.HIT_PARTICLES) {
+            const color = source.classData?.color ?? 0xffffff;
+            this._spawnHitParticles(target.x, target.y, angle, color, isCrit);
+        }
+
+        EventBus.emit(Events.ENTITY_DAMAGED, { source, target, damage: finalDamage, isCrit });
     }
 
     /**
@@ -446,6 +462,46 @@ export class CombatSystem {
     }
 
     // ─── Visual Effects ──────────────────────────────────────────────────────
+
+    /**
+     * [FEATURE: HIT_PARTICLES]
+     * Spawn a small burst of coloured arc-circles at the point of impact.
+     * Uses Phaser's Arc GameObjects (no texture needed) + tweens.
+     * @param {number} x
+     * @param {number} y
+     * @param {number} hitAngle - direction of the hit (radians), particles spread around it
+     * @param {number} color    - hex colour matching attacker class
+     * @param {boolean} isCrit  - crits get more / bigger particles
+     */
+    _spawnHitParticles(x, y, hitAngle, color, isCrit = false) {
+        const count   = isCrit ? 10 : 6;
+        const spread  = Math.PI * 0.6;   // radians of spread around hit direction
+        const minSpd  = isCrit ? 90 : 60;
+        const maxSpd  = isCrit ? 180 : 120;
+        const radius  = isCrit ? 4 : 3;
+
+        for (let i = 0; i < count; i++) {
+            const angle = hitAngle - spread / 2 + (spread / (count - 1)) * i
+                        + (Math.random() - 0.5) * 0.3;
+            const speed = minSpd + Math.random() * (maxSpd - minSpd);
+            const life  = 200 + Math.random() * 150;
+
+            const circle = this.scene.add.circle(x, y, radius, color, 1);
+            circle.setDepth(60);
+
+            this.scene.tweens.add({
+                targets: circle,
+                x: x + Math.cos(angle) * speed * (life / 1000),
+                y: y + Math.sin(angle) * speed * (life / 1000),
+                alpha: 0,
+                scaleX: 0,
+                scaleY: 0,
+                duration: life,
+                ease: 'Power2',
+                onComplete: () => circle.destroy(),
+            });
+        }
+    }
 
     /**
      * [FEATURE: DAMAGE_VIGNETTE]
@@ -523,25 +579,54 @@ export class CombatSystem {
      * @param {number} y
      * @param {number|string} amount - damage value or pre-formatted string (e.g. '+30')
      * @param {number|string} color - hex int (0xrrggbb) or CSS color string
+     * @param {object} [opts] - optional styling hints { isCrit, isHeal }
      */
-    showDamageNumber(x, y, amount, color = 0xffffff) {
+    showDamageNumber(x, y, amount, color = 0xffffff, opts = {}) {
         const text = this._acquireDamageNumber();
-        const colorStr = typeof color === 'string'
-            ? color
-            : '#' + color.toString(16).padStart(6, '0');
+
+        // [FEATURE: DYNAMIC_DAMAGE_NUMBERS] vary size/colour/speed by hit type
+        let colorStr, fontSize, floatDist, duration;
+        if (FeatureFlags.DYNAMIC_DAMAGE_NUMBERS) {
+            if (opts.isCrit) {
+                colorStr  = '#ffdd00';
+                fontSize  = '20px';
+                floatDist = 55;
+                duration  = GameConfig.DAMAGE_NUMBER_DURATION * 1.1;
+                amount    = `${amount}!`;
+            } else if (opts.isHeal) {
+                colorStr  = '#44ff88';
+                fontSize  = '15px';
+                floatDist = 30;
+                duration  = GameConfig.DAMAGE_NUMBER_DURATION * 1.3;
+            } else {
+                // Normal damage — keep existing look
+                colorStr  = typeof color === 'string' ? color : '#' + color.toString(16).padStart(6, '0');
+                fontSize  = '14px';
+                floatDist = 30;
+                duration  = GameConfig.DAMAGE_NUMBER_DURATION;
+            }
+        } else {
+            // Original behaviour
+            colorStr  = typeof color === 'string' ? color : '#' + color.toString(16).padStart(6, '0');
+            fontSize  = '14px';
+            floatDist = 30;
+            duration  = GameConfig.DAMAGE_NUMBER_DURATION;
+        }
 
         text.setPosition(x, y - 10);
-        text.setStyle({ color: colorStr });
+        text.setStyle({ color: colorStr, fontSize });
         text.setText(String(amount));
         text.setAlpha(1);
+        text.setScale(opts.isCrit && FeatureFlags.DYNAMIC_DAMAGE_NUMBERS ? 1.25 : 1);
 
         this.scene.tweens.add({
             targets: text,
-            y: y - 40,
+            y: y - 10 - floatDist,
             alpha: 0,
-            duration: GameConfig.DAMAGE_NUMBER_DURATION,
+            duration,
             ease: 'Power2',
             onComplete: () => {
+                text.setScale(1);
                 text.setVisible(false);
                 text.setActive(false);
             }

@@ -319,9 +319,47 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         this.setAlpha(0.5);
 
         const iframeDuration = GameConfig.DODGE_DURATION * GameConfig.DODGE_IFRAME_RATIO;
-        this.scene.time.delayedCall(iframeDuration, () => {
-            this.isInvincible = false;
-        });
+
+        // [FEATURE: DODGE_IFRAME_AURA] Blue pulsing ring visible only during iframes
+        if (FeatureFlags.DODGE_IFRAME_AURA) {
+            const aura = this.scene.add.circle(this.x, this.y, 18, 0x44aaff, 0);
+            aura.setStrokeStyle(2, 0x44aaff, 0.8);
+            aura.setDepth(this.depth - 1);
+
+            // Follow player position each frame
+            const trackAura = () => {
+                if (aura.active) { aura.x = this.x; aura.y = this.y; }
+            };
+            this.scene.events.on('update', trackAura);
+
+            // Pulse tween while active
+            const pulseTween = this.scene.tweens.add({
+                targets: aura,
+                scaleX: 1.25,
+                scaleY: 1.25,
+                duration: 100,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut',
+            });
+
+            // Remove exactly when iframes end
+            this.scene.time.delayedCall(iframeDuration, () => {
+                this.isInvincible = false;
+                pulseTween.stop();
+                this.scene.events.off('update', trackAura);
+                this.scene.tweens.add({
+                    targets: aura,
+                    alpha: 0,
+                    duration: 80,
+                    onComplete: () => aura.destroy(),
+                });
+            });
+        } else {
+            this.scene.time.delayedCall(iframeDuration, () => {
+                this.isInvincible = false;
+            });
+        }
 
         this.scene.time.delayedCall(GameConfig.DODGE_DURATION, () => {
             this.isDodging = false;

@@ -2,6 +2,7 @@ import { ENTITY_STATES } from '../utils/Constants.js';
 import { EventBus, Events } from '../utils/EventBus.js';
 import { distance } from '../utils/MathUtils.js';
 import { GameConfig } from '../config/GameConfig.js';
+import { FeatureFlags } from '../config/FeatureFlags.js';
 
 /**
  * Base enemy class. All enemy types extend this.
@@ -100,6 +101,11 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
             scoreValue: this.enemyData.scoreValue || 0
         });
 
+        // [FEATURE: DEATH_PARTICLES] Burst of coloured circles on death
+        if (FeatureFlags.DEATH_PARTICLES) {
+            this._spawnDeathParticles();
+        }
+
         // Death animation: shrink and fade
         this.scene.tweens.add({
             targets: this,
@@ -155,6 +161,48 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
         }
 
         // Override in subclasses for AI behavior
+    }
+
+    /**
+     * [FEATURE: DEATH_PARTICLES]
+     * Burst of small coloured circles radiating outward from the enemy's position.
+     * Uses Phaser Arc GameObjects — no texture needed.
+     */
+    _spawnDeathParticles() {
+        const count = 12;
+        // Pick a colour per enemy type; fall back to a neutral brown
+        const colorMap = {
+            swarmer: 0xaa5522,
+            bruiser: 0x886644,
+            ranged:  0x4488aa,
+            bomber:  0xff4422,
+            elite:   0xaa44cc,
+        };
+        const color = colorMap[this.enemyData?.type] ?? 0x888866;
+        const x = this.x;
+        const y = this.y;
+
+        for (let i = 0; i < count; i++) {
+            const angle = (Math.PI * 2 / count) * i + Math.random() * 0.4;
+            const speed = 60 + Math.random() * 80;
+            const life  = 300 + Math.random() * 200;
+            const r     = 3 + Math.random() * 2;
+
+            const circle = this.scene.add.circle(x, y, r, color, 1);
+            circle.setDepth(55);
+
+            this.scene.tweens.add({
+                targets: circle,
+                x: x + Math.cos(angle) * speed * (life / 1000),
+                y: y + Math.sin(angle) * speed * (life / 1000),
+                alpha: 0,
+                scaleX: 0,
+                scaleY: 0,
+                duration: life,
+                ease: 'Power2',
+                onComplete: () => circle.destroy(),
+            });
+        }
     }
 
     /**

@@ -406,9 +406,9 @@ export class DebugBalancePanel {
                 flags: [
                     { key: 'SCREEN_SHAKE',        label: 'Screen Shake on Hits',        implemented: true  },
                     { key: 'DAMAGE_VIGNETTE',     label: 'Red Vignette on Player Hit',  implemented: true  },
-                    { key: 'DEATH_PARTICLES',     label: 'Particle Burst on Kill',      implemented: false },
-                    { key: 'HIT_PARTICLES',       label: 'Spark Particles on Impact',   implemented: false },
-                    { key: 'DODGE_IFRAME_AURA',   label: 'Iframe Aura on Dodge',        implemented: false },
+                    { key: 'DEATH_PARTICLES',     label: 'Particle Burst on Kill',      implemented: true  },
+                    { key: 'HIT_PARTICLES',       label: 'Spark Particles on Impact',   implemented: true  },
+                    { key: 'DODGE_IFRAME_AURA',   label: 'Iframe Aura on Dodge',        implemented: true  },
                     { key: 'PROJECTILE_GLOW',     label: 'Projectile Glow Ring',        implemented: false },
                     { key: 'STATUS_EFFECT_AURA',  label: 'Status Aura on Entities',     implemented: false },
                     { key: 'BIOME_COLOR_GRADING', label: 'Biome Color Grading (CRT)',   implemented: false },
@@ -420,9 +420,9 @@ export class DebugBalancePanel {
                 color: '#ff6644',
                 flags: [
                     { key: 'HIT_STOP',               label: 'Hit Stop (Physics Pause)',  implemented: false },
-                    { key: 'CRIT_SYSTEM',             label: 'Crit Rolls + Gold Numbers', implemented: false },
+                    { key: 'CRIT_SYSTEM',             label: 'Crit Rolls + Gold Numbers', implemented: true  },
                     { key: 'HITSTUN',                 label: 'Hitstun on Knockback',      implemented: false },
-                    { key: 'DYNAMIC_DAMAGE_NUMBERS',  label: 'Dynamic Damage Numbers',    implemented: false },
+                    { key: 'DYNAMIC_DAMAGE_NUMBERS',  label: 'Dynamic Damage Numbers',    implemented: true  },
                 ],
             },
             {

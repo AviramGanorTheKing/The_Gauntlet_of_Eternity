@@ -1219,6 +1219,10 @@ export class GameScene extends Phaser.Scene {
     update(time, delta) {
         if (!this.player) return;
 
+        // Cache enemies array once per frame — shared by companions, projectiles, and HP bars
+        // Avoids repeated getChildren() calls (each allocates a new array)
+        this._cachedEnemyChildren = this.enemies.getChildren();
+
         // Safety net: if player is on a non-walkable tile, snap back
         if (this.player.alive && this.dungeonManager) {
             const ts = GameConfig.TILE_SIZE;
@@ -1280,8 +1284,15 @@ export class GameScene extends Phaser.Scene {
         if (!gfx) return;
         gfx.clear();
 
-        // Enemy + Boss HP bars
-        const enemies = this.enemies.getChildren();
+        // Viewport bounds for culling — only draw bars for on-screen entities
+        const cam = this.cameras.main;
+        const camL = cam.scrollX - 48;
+        const camR = cam.scrollX + cam.width + 48;
+        const camT = cam.scrollY - 48;
+        const camB = cam.scrollY + cam.height + 48;
+
+        // Enemy + Boss HP bars — use pre-cached array from update()
+        const enemies = this._cachedEnemyChildren || this.enemies.getChildren();
         for (let i = 0, len = enemies.length; i < len; i++) {
             const e = enemies[i];
             if (!e.alive || !e.visible) continue;
@@ -1292,6 +1303,9 @@ export class GameScene extends Phaser.Scene {
             const yOff = isBoss ? (e.bossData.size + 8) : 19; // offset above sprite
             const bx = e.x - w / 2;
             const by = e.y - yOff;
+
+            // Viewport cull — skip off-screen entities entirely
+            if (e.x < camL || e.x > camR || e.y < camT || e.y > camB) continue;
 
             const frac = e.maxHp > 0 ? e.hp / e.maxHp : 0;
 
@@ -1345,6 +1359,7 @@ export class GameScene extends Phaser.Scene {
         for (let i = 0, len = minions.length; i < len; i++) {
             const m = minions[i];
             if (!m.alive || !m.visible) continue;
+            if (m.x < camL || m.x > camR || m.y < camT || m.y > camB) continue;
 
             const w = 24;
             const h = 3;

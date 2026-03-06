@@ -288,9 +288,12 @@ export class AnnouncerSystem {
     _onEnemyDied() {
         this._killStreak++;
 
-        // Reset streak after 3s of no kills
-        if (this._killStreakTimer) clearTimeout(this._killStreakTimer);
-        this._killStreakTimer = setTimeout(() => { this._killStreak = 0; }, 3000);
+        // Reset streak after 3s of no kills — use Phaser timer to avoid GC pressure from native setTimeout
+        if (this._killStreakTimer) this._killStreakTimer.destroy();
+        this._killStreakTimer = this.scene.time.delayedCall(3000, () => {
+            this._killStreak = 0;
+            this._killStreakTimer = null;
+        });
 
         if (this._killStreak >= 10) {
             this.trigger('kill_streak');
@@ -318,6 +321,6 @@ export class AnnouncerSystem {
         EventBus.off(Events.BOSS_DEFEATED, this._onBossDefeated, this);
 
         this._stopCurrent();
-        if (this._killStreakTimer) clearTimeout(this._killStreakTimer);
+        if (this._killStreakTimer) { this._killStreakTimer.destroy(); this._killStreakTimer = null; }
     }
 }

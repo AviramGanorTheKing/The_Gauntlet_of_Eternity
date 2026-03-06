@@ -2,7 +2,13 @@ import { ENTITY_STATES } from '../utils/Constants.js';
 import { EventBus, Events } from '../utils/EventBus.js';
 import { ClassData } from '../config/ClassData.js';
 import { GameConfig } from '../config/GameConfig.js';
-import { distance } from '../utils/MathUtils.js';
+
+// Module-level constant — allocated once, not on every _followPlayer() call
+const FORMATION_OFFSETS = [
+    { angle: Math.PI * 0.75, dist: 40 },  // back-left
+    { angle: -Math.PI * 0.75, dist: 40 }, // back-right
+    { angle: Math.PI, dist: 50 },          // directly behind
+];
 
 /**
  * Companion — an AI-controlled ally that fights alongside the player.
@@ -66,6 +72,10 @@ export class Companion extends Phaser.Physics.Arcade.Sprite {
 
         // Formation offset index (set externally after creation)
         this.formationIndex = 0;
+
+        // AI throttle counter — target scan runs every 8 frames, not every frame
+        this._aiFrameCount = 0;
+        this._targetDistSq = Infinity;
 
         // Revival
         this.downed = false;
@@ -174,9 +184,10 @@ export class Companion extends Phaser.Physics.Arcade.Sprite {
                 return;
             }
 
-            // Check if player is close enough for revival
-            const d = distance(this.x, this.y, this.owner.x, this.owner.y);
-            if (d < 40) {
+            // Check if player is close enough for revival (squared — no sqrt)
+            const rdx = this.x - this.owner.x;
+            const rdy = this.y - this.owner.y;
+            if (rdx * rdx + rdy * rdy < 40 * 40) {
                 this.reviveTimer += delta;
                 if (this.reviveTimer >= 3000) {
                     this.revive();
@@ -214,29 +225,40 @@ export class Companion extends Phaser.Physics.Arcade.Sprite {
     }
 
     _updateAI(delta) {
-        // Find target enemy
         const enemies = this.scene.enemies;
         if (!enemies) return;
 
-        let closest = null;
-        let closestDist = Infinity;
+        this._aiFrameCount++;
 
-        for (const enemy of enemies.getChildren()) {
-            if (!enemy.alive) continue;
-            const d = distance(this.x, this.y, enemy.x, enemy.y);
-            if (d < closestDist) {
-                closestDist = d;
-                closest = enemy;
+        // Full target scan every 8 frames (~133ms at 60fps).
+        // Between scans, just refresh distance to the cached target.
+        if (this._aiFrameCount % 8 === 0 || !this.target?.alive) {
+            let closest = null;
+            let closestDistSq = Infinity;
+            // Use scene's pre-cached array when available (computed once per frame in GameScene.update)
+            const list = this.scene._cachedEnemyChildren || enemies.getChildren();
+            for (let i = 0, len = list.length; i < len; i++) {
+                const enemy = list[i];
+                if (!enemy.alive) continue;
+                const dx = enemy.x - this.x;
+                const dy = enemy.y - this.y;
+                const dSq = dx * dx + dy * dy;
+                if (dSq < closestDistSq) { closestDistSq = dSq; closest = enemy; }
             }
+            this.target = closest;
+            this._targetDistSq = closestDistSq;
+        } else if (this.target) {
+            // Cheap distance refresh to cached target
+            const dx = this.target.x - this.x;
+            const dy = this.target.y - this.y;
+            this._targetDistSq = dx * dx + dy * dy;
         }
 
-        this.target = closest;
-
-        if (closest && closestDist <= this.aggroRange) {
-            // Combat behavior based on AI type
-            this._combatBehavior(closest, closestDist, delta);
+        const aggroRangeSq = this.aggroRange * this.aggroRange;
+        if (this.target && this._targetDistSq <= aggroRangeSq) {
+            // sqrt only when we actually need a real distance for movement math
+            this._combatBehavior(this.target, Math.sqrt(this._targetDistSq), delta);
         } else {
-            // Follow player
             this._followPlayer(delta);
         }
     }
@@ -331,30 +353,22 @@ export class Companion extends Phaser.Physics.Arcade.Sprite {
     }
 
     _followPlayer(delta) {
-        // Formation offsets so companions spread out behind the player
-        const FORMATION_OFFSETS = [
-            { angle: Math.PI * 0.75, dist: 40 },   // back-left
-            { angle: -Math.PI * 0.75, dist: 40 },   // back-right
-            { angle: Math.PI, dist: 50 },             // directly behind
-        ];
+        // FORMATION_OFFSETS is a module-level const — not re-allocated each call
         const formation = FORMATION_OFFSETS[this.formationIndex % FORMATION_OFFSETS.length];
-
-        // Offset is relative to player's facing angle
         const playerAngle = this.owner.facingAngle || 0;
         const targetX = this.owner.x + Math.cos(playerAngle + formation.angle) * formation.dist;
         const targetY = this.owner.y + Math.sin(playerAngle + formation.angle) * formation.dist;
 
         const dx = targetX - this.x;
         const dy = targetY - this.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        const distSq = dx * dx + dy * dy;
 
-        if (dist > 20) {
-            const len = dist || 1;
-            // Speed up if falling behind
-            const speedMult = dist > 100 ? 1.2 : 0.8;
+        if (distSq > 20 * 20) {
+            const dist = Math.sqrt(distSq);
+            const speedMult = distSq > 100 * 100 ? 1.2 : 0.8;
             this.body.setVelocity(
-                (dx / len) * this.moveSpeed * speedMult,
-                (dy / len) * this.moveSpeed * speedMult
+                (dx / dist) * this.moveSpeed * speedMult,
+                (dy / dist) * this.moveSpeed * speedMult
             );
         } else {
             this.body.setVelocity(0, 0);

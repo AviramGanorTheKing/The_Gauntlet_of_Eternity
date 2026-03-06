@@ -186,6 +186,9 @@ export class UIScene extends Phaser.Scene {
 
         // Special ability icon with radial cooldown sweep
         this.specialGfx = this.add.graphics().setDepth(300);
+        // Cache for cooldown dirty-checking — avoids clear()+redraw every frame
+        this._lastSpecialCdBucket = -1; // quantized cdFrac (0-50 buckets)
+        this._lastSpecialReady = null;  // null forces first draw
         this.specialX = BR_X;
         this.specialY = BR_Y;
         this.specialRadius = 22;
@@ -197,6 +200,8 @@ export class UIScene extends Phaser.Scene {
 
         // Dodge cooldown dot
         this.dodgeGfx = this.add.graphics().setDepth(300);
+        this._lastDodgeCdBucket = -1;
+        this._lastDodgeReady = null;
         this.dodgeX = BR_X + 40;
         this.dodgeY = BR_Y + 6;
         this.dodgeRadius = 8;
@@ -441,15 +446,6 @@ export class UIScene extends Phaser.Scene {
     }
 
     _updateSpecialCooldown(player) {
-        this.specialGfx.clear();
-        const x = this.specialX;
-        const y = this.specialY;
-        const r = this.specialRadius;
-
-        // Background circle
-        this.specialGfx.fillStyle(0x111133, 0.9);
-        this.specialGfx.fillCircle(x, y, r);
-
         // Determine cooldown fraction
         let cdFrac = 0;
         if (player.specialCooldownTimer > 0 && player.specialCooldownDuration > 0) {
@@ -459,6 +455,21 @@ export class UIScene extends Phaser.Scene {
         // Has enough mana?
         const hasEnoughMana = player.mana >= (player.specialManaCost || 0);
         const isReady = cdFrac <= 0 && hasEnoughMana;
+
+        // Quantize to 50 buckets (2% steps) — skip redraw if state unchanged
+        const bucket = Math.round(cdFrac * 50);
+        if (bucket === this._lastSpecialCdBucket && isReady === this._lastSpecialReady) return;
+        this._lastSpecialCdBucket = bucket;
+        this._lastSpecialReady = isReady;
+
+        this.specialGfx.clear();
+        const x = this.specialX;
+        const y = this.specialY;
+        const r = this.specialRadius;
+
+        // Background circle
+        this.specialGfx.fillStyle(0x111133, 0.9);
+        this.specialGfx.fillCircle(x, y, r);
 
         if (cdFrac > 0) {
             // Radial cooldown sweep (pie-chart style)
@@ -504,16 +515,21 @@ export class UIScene extends Phaser.Scene {
     }
 
     _updateDodgeCooldown(player) {
-        this.dodgeGfx.clear();
-        const x = this.dodgeX;
-        const y = this.dodgeY;
-        const r = this.dodgeRadius;
-
         // Determine dodge readiness
         let cdFrac = 0;
         if (player.dodgeCooldownTimer > 0 && player.dodgeCooldownDuration > 0) {
             cdFrac = player.dodgeCooldownTimer / player.dodgeCooldownDuration;
         }
+        const isReady = cdFrac <= 0;
+        const bucket = Math.round(cdFrac * 50);
+        if (bucket === this._lastDodgeCdBucket && isReady === this._lastDodgeReady) return;
+        this._lastDodgeCdBucket = bucket;
+        this._lastDodgeReady = isReady;
+
+        this.dodgeGfx.clear();
+        const x = this.dodgeX;
+        const y = this.dodgeY;
+        const r = this.dodgeRadius;
 
         // Background
         this.dodgeGfx.fillStyle(0x111122, 0.8);

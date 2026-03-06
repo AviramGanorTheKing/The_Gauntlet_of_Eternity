@@ -412,7 +412,7 @@ export class DebugBalancePanel {
                     { key: 'PROJECTILE_GLOW',     label: 'Projectile Glow Ring',        implemented: false },
                     { key: 'STATUS_EFFECT_AURA',  label: 'Status Aura on Entities',     implemented: false },
                     { key: 'BIOME_COLOR_GRADING', label: 'Biome Color Grading (CRT)',   implemented: false },
-                    { key: 'BOSS_PHASE_VFX',      label: 'Boss Phase Transition VFX',   implemented: false },
+                    { key: 'BOSS_PHASE_VFX',      label: 'Boss Phase Transition VFX',   implemented: true  },
                 ],
             },
             {
@@ -430,11 +430,11 @@ export class DebugBalancePanel {
                 color: '#44ff88',
                 flags: [
                     { key: 'WEAPON_SWAP_SFX',       label: 'Weapon Swap SFX',           implemented: true  },
-                    { key: 'BOSS_ENTRANCE',          label: 'Boss Entrance Sequence',    implemented: false },
+                    { key: 'BOSS_ENTRANCE',          label: 'Boss Entrance Sequence',    implemented: true  },
                     { key: 'FLOOR_TRANSITION_SCREEN',label: 'Floor Transition Summary',  implemented: false },
                     { key: 'TUTORIAL_HINTS',         label: 'Context Hints (New Player)',implemented: false },
                     { key: 'LOW_HEALTH_HEARTBEAT',   label: 'Low HP Heartbeat Audio',    implemented: false },
-                    { key: 'WEAPON_LEVELUP_FANFARE', label: 'Weapon Level-Up Fanfare',   implemented: false },
+                    { key: 'WEAPON_LEVELUP_FANFARE', label: 'Weapon Level-Up Fanfare',   implemented: true  },
                 ],
             },
             {
@@ -443,7 +443,7 @@ export class DebugBalancePanel {
                 flags: [
                     { key: 'EVENT_ROOMS',           label: 'Random Event Rooms',        implemented: false },
                     { key: 'SHOP_VARIETY',          label: 'Shop Archetypes',           implemented: false },
-                    { key: 'FLOOR_DIFFICULTY_SCALE',label: 'Floor Difficulty Scaling',  implemented: false },
+                    { key: 'FLOOR_DIFFICULTY_SCALE',label: 'Floor Difficulty Scaling',  implemented: true  },
                     { key: 'LOOT_PITY',             label: 'Loot Pity Counter',         implemented: false },
                     { key: 'ASCENSION_PERKS',       label: 'Class Ascension Perks',     implemented: false },
                 ],

@@ -1,6 +1,7 @@
 import { EventBus, Events } from '../utils/EventBus.js';
 import { StatusEffectData } from '../config/StatusEffectData.js';
 import { RARITY_COLORS } from '../config/GearData.js';
+import { FeatureFlags } from '../config/FeatureFlags.js';
 
 /**
  * UIScene — runs in parallel above GameScene.
@@ -818,13 +819,21 @@ export class UIScene extends Phaser.Scene {
                 this._weaponLevelUpText.y += 20;
             }
         });
+
+        // [FEATURE: WEAPON_LEVELUP_FANFARE]
+        if (FeatureFlags.WEAPON_LEVELUP_FANFARE) {
+            const gs = this.scene.get('GameScene');
+            gs?.cameras.main.flash(150, 255, 255, 255);
+            gs?.audioManager?.playSFX('sfx_sounds_powerup4');
+        }
+
         // Refresh weapon display
         const player = this.scene.get('GameScene')?.player;
         if (player) this._refreshGearText(player);
     }
 
     _onWeaponPerkUnlocked({ weapon, perk }) {
-        this._weaponPerkText.setText(`${perk.name} unlocked! (${perk.desc})`);
+        this._weaponPerkText.setText(`PERK: ${perk.name} unlocked!`);
         this._weaponPerkText.setVisible(true).setAlpha(1);
         this.tweens.killTweensOf(this._weaponPerkText);
         this.tweens.add({
@@ -833,6 +842,14 @@ export class UIScene extends Phaser.Scene {
             delay: 1800, duration: 500,
             onComplete: () => this._weaponPerkText.setVisible(false)
         });
+
+        // [FEATURE: WEAPON_LEVELUP_FANFARE] Bigger fanfare for perk unlocks
+        if (FeatureFlags.WEAPON_LEVELUP_FANFARE) {
+            const gs = this.scene.get('GameScene');
+            gs?.cameras.main.flash(200, 255, 220, 50);  // gold flash for perk
+            gs?.cameras.main.shake(120, 0.002);
+            gs?.audioManager?.playSFX('sfx_sounds_fanfare2');
+        }
     }
 
     _refreshGearText(player) {

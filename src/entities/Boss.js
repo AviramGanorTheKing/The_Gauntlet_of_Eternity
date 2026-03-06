@@ -2,6 +2,7 @@ import { ENTITY_STATES } from '../utils/Constants.js';
 import { EventBus, Events } from '../utils/EventBus.js';
 import { distance } from '../utils/MathUtils.js';
 import { GameConfig } from '../config/GameConfig.js';
+import { FeatureFlags } from '../config/FeatureFlags.js';
 
 /**
  * Boss — base entity for all boss encounters.
@@ -125,6 +126,11 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
                 this.scene.cameras.main.flash(300, 255, 100, 100);
             }
 
+            // [FEATURE: BOSS_PHASE_VFX] Expanding ring + particle burst
+            if (FeatureFlags.BOSS_PHASE_VFX && this.scene) {
+                this._spawnPhaseTransitionVFX();
+            }
+
             // Emit event for UI/audio
             EventBus.emit('BOSS_PHASE_CHANGE', {
                 boss: this,
@@ -135,6 +141,63 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
             // Subclass hook for phase-specific effects
             this.onPhaseTransition(this.currentPhase);
         }
+    }
+
+    /**
+     * [FEATURE: BOSS_PHASE_VFX]
+     * Expanding shockwave ring + radial particle burst at boss position.
+     */
+    _spawnPhaseTransitionVFX() {
+        const scene = this.scene;
+        const x = this.x;
+        const y = this.y;
+        const color = this.bossData?.color ?? 0xff4444;
+
+        // Boss rapid blink (3 flashes over 300ms)
+        for (let i = 0; i < 6; i++) {
+            scene.time.delayedCall(i * 50, () => {
+                if (this.active) this.setAlpha(i % 2 === 0 ? 0.2 : 1);
+            });
+        }
+        scene.time.delayedCall(300, () => { if (this.active) this.setAlpha(1); });
+
+        // Expanding shockwave ring
+        const ring = scene.add.circle(x, y, 20, color, 0);
+        ring.setStrokeStyle(4, color, 1);
+        ring.setDepth(60);
+        scene.tweens.add({
+            targets: ring,
+            scaleX: 6,
+            scaleY: 6,
+            alpha: 0,
+            duration: 500,
+            ease: 'Power2',
+            onComplete: () => ring.destroy(),
+        });
+
+        // Radial particle burst (16 circles)
+        const count = 16;
+        for (let i = 0; i < count; i++) {
+            const angle = (Math.PI * 2 / count) * i;
+            const speed = 100 + Math.random() * 80;
+            const life  = 400 + Math.random() * 200;
+            const circle = scene.add.circle(x, y, 4, color, 1);
+            circle.setDepth(61);
+            scene.tweens.add({
+                targets: circle,
+                x: x + Math.cos(angle) * speed * (life / 1000),
+                y: y + Math.sin(angle) * speed * (life / 1000),
+                alpha: 0,
+                scaleX: 0,
+                scaleY: 0,
+                duration: life,
+                ease: 'Power2',
+                onComplete: () => circle.destroy(),
+            });
+        }
+
+        // Camera shake
+        scene.cameras.main.shake(250, 0.008);
     }
 
     /** Override in subclasses for boss-specific phase transition visuals. */

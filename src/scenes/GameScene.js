@@ -40,6 +40,7 @@ import { AnnouncerSystem } from '../systems/AnnouncerSystem.js';
 import { TutorialPromptSystem } from '../systems/TutorialPromptSystem.js';
 import { LoreData } from '../config/LoreData.js';
 import { PauseScene } from './PauseScene.js';
+import { FeatureFlags } from '../config/FeatureFlags.js';
 
 // Player class lookup by key
 const PLAYER_CLASSES = {
@@ -732,6 +733,16 @@ export class GameScene extends Phaser.Scene {
         }
 
         enemy.setTarget(this.player);
+
+        // [FEATURE: FLOOR_DIFFICULTY_SCALE] Scale HP and damage per floor
+        if (FeatureFlags.FLOOR_DIFFICULTY_SCALE && this.currentFloor > 1) {
+            const hpMult  = 1 + (this.currentFloor - 1) * 0.12;
+            const dmgMult = 1 + (this.currentFloor - 1) * 0.08;
+            enemy.hp      = Math.ceil(enemy.hp * hpMult);
+            enemy.maxHp   = Math.ceil(enemy.maxHp * hpMult);
+            enemy.damage  = Math.ceil(enemy.damage * dmgMult);
+        }
+
         this.enemies.add(enemy);
         this.activeEnemyCount++;
         EventBus.emit(Events.ENEMY_SPAWNED, { enemy });
@@ -861,8 +872,43 @@ export class GameScene extends Phaser.Scene {
         const wallLayer = this.dungeonManager.getCollisionLayer();
         this.physics.add.collider(boss, wallLayer);
 
-        // Camera shake for dramatic effect
-        this.cameras.main.shake(200, 0.01);
+        // [FEATURE: BOSS_ENTRANCE] Dramatic entrance sequence
+        if (FeatureFlags.BOSS_ENTRANCE) {
+            // Boss starts invisible
+            boss.setAlpha(0);
+
+            // Black flash → boss fades in
+            this.cameras.main.flash(300, 0, 0, 0);
+            this.cameras.main.shake(400, 0.012);
+
+            // Fade boss in after flash
+            this.time.delayedCall(250, () => {
+                if (!boss.active) return;
+                this.tweens.add({
+                    targets: boss,
+                    alpha: 1,
+                    duration: 600,
+                    ease: 'Power2',
+                });
+
+                // Expanding red shockwave ring at boss spawn
+                const ring = this.add.circle(bx, by, 16, 0xff2222, 0);
+                ring.setStrokeStyle(5, 0xff2222, 1);
+                ring.setDepth(60);
+                this.tweens.add({
+                    targets: ring,
+                    scaleX: 8,
+                    scaleY: 8,
+                    alpha: 0,
+                    duration: 700,
+                    ease: 'Power2',
+                    onComplete: () => ring.destroy(),
+                });
+            });
+        } else {
+            // Original shake
+            this.cameras.main.shake(200, 0.01);
+        }
     }
 
     /**

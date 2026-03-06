@@ -41,7 +41,7 @@ export class DebugBalancePanel {
         // Tabs
         const tabs = document.createElement('div');
         tabs.style.cssText = 'display: flex; border-bottom: 1px solid #444;';
-        for (const tab of ['players', 'enemies', 'global', 'dev']) {
+        for (const tab of ['players', 'enemies', 'global', 'dev', 'features']) {
             const btn = document.createElement('div');
             btn.textContent = tab.toUpperCase();
             btn.dataset.tab = tab;
@@ -89,6 +89,7 @@ export class DebugBalancePanel {
             case 'enemies': this._renderEnemiesTab(); break;
             case 'global': this._renderGlobalTab(); break;
             case 'dev': this._renderDevTab(); break;
+            case 'features': this._renderFeaturesTab(); break;
         }
     }
 
@@ -385,6 +386,152 @@ export class DebugBalancePanel {
         goldRow.appendChild(goldInput);
         goldRow.appendChild(goldBtn);
         this.content.appendChild(goldRow);
+    }
+
+    // ── Features Tab ───────────────────────────────────────────────────────
+
+    _renderFeaturesTab() {
+        const FF = window.FeatureFlags;
+        if (!FF) {
+            this.content.innerHTML = '<div style="color:#ff4444; padding: 16px;">FeatureFlags not loaded</div>';
+            return;
+        }
+
+        // Map of flag key → { label, implemented }
+        // Set implemented: true only for flags that have working code behind them.
+        const sections = [
+            {
+                title: 'GRAPHICS & VISUALS',
+                color: '#44aaff',
+                flags: [
+                    { key: 'SCREEN_SHAKE',        label: 'Screen Shake on Hits',        implemented: true  },
+                    { key: 'DAMAGE_VIGNETTE',     label: 'Red Vignette on Player Hit',  implemented: true  },
+                    { key: 'DEATH_PARTICLES',     label: 'Particle Burst on Kill',      implemented: false },
+                    { key: 'HIT_PARTICLES',       label: 'Spark Particles on Impact',   implemented: false },
+                    { key: 'DODGE_IFRAME_AURA',   label: 'Iframe Aura on Dodge',        implemented: false },
+                    { key: 'PROJECTILE_GLOW',     label: 'Projectile Glow Ring',        implemented: false },
+                    { key: 'STATUS_EFFECT_AURA',  label: 'Status Aura on Entities',     implemented: false },
+                    { key: 'BIOME_COLOR_GRADING', label: 'Biome Color Grading (CRT)',   implemented: false },
+                    { key: 'BOSS_PHASE_VFX',      label: 'Boss Phase Transition VFX',   implemented: false },
+                ],
+            },
+            {
+                title: 'COMBAT FEEL',
+                color: '#ff6644',
+                flags: [
+                    { key: 'HIT_STOP',               label: 'Hit Stop (Physics Pause)',  implemented: false },
+                    { key: 'CRIT_SYSTEM',             label: 'Crit Rolls + Gold Numbers', implemented: false },
+                    { key: 'HITSTUN',                 label: 'Hitstun on Knockback',      implemented: false },
+                    { key: 'DYNAMIC_DAMAGE_NUMBERS',  label: 'Dynamic Damage Numbers',    implemented: false },
+                ],
+            },
+            {
+                title: 'UX & POLISH',
+                color: '#44ff88',
+                flags: [
+                    { key: 'WEAPON_SWAP_SFX',       label: 'Weapon Swap SFX',           implemented: true  },
+                    { key: 'BOSS_ENTRANCE',          label: 'Boss Entrance Sequence',    implemented: false },
+                    { key: 'FLOOR_TRANSITION_SCREEN',label: 'Floor Transition Summary',  implemented: false },
+                    { key: 'TUTORIAL_HINTS',         label: 'Context Hints (New Player)',implemented: false },
+                    { key: 'LOW_HEALTH_HEARTBEAT',   label: 'Low HP Heartbeat Audio',    implemented: false },
+                    { key: 'WEAPON_LEVELUP_FANFARE', label: 'Weapon Level-Up Fanfare',   implemented: false },
+                ],
+            },
+            {
+                title: 'CONTENT & DESIGN',
+                color: '#ffaa00',
+                flags: [
+                    { key: 'EVENT_ROOMS',           label: 'Random Event Rooms',        implemented: false },
+                    { key: 'SHOP_VARIETY',          label: 'Shop Archetypes',           implemented: false },
+                    { key: 'FLOOR_DIFFICULTY_SCALE',label: 'Floor Difficulty Scaling',  implemented: false },
+                    { key: 'LOOT_PITY',             label: 'Loot Pity Counter',         implemented: false },
+                    { key: 'ASCENSION_PERKS',       label: 'Class Ascension Perks',     implemented: false },
+                ],
+            },
+        ];
+
+        for (const section of sections) {
+            // Section header
+            const title = document.createElement('div');
+            title.textContent = section.title;
+            title.style.cssText = `
+                color: ${section.color}; font-size: 11px; font-weight: bold;
+                margin: 12px 0 6px; border-bottom: 1px solid #333; padding-bottom: 3px;
+                letter-spacing: 1px;
+            `;
+            this.content.appendChild(title);
+
+            for (const flag of section.flags) {
+                this.content.appendChild(
+                    this._featureToggleRow(FF, flag.key, flag.label, flag.implemented)
+                );
+            }
+        }
+    }
+
+    /**
+     * Build one feature toggle row.
+     * @param {object} FF - FeatureFlags reference
+     * @param {string} key - Flag key
+     * @param {string} label - Human-readable label
+     * @param {boolean} implemented - Whether the feature has working code
+     */
+    _featureToggleRow(FF, key, label, implemented) {
+        const row = document.createElement('div');
+        row.style.cssText = `
+            display: flex; align-items: center; justify-content: space-between;
+            margin: 4px 0; padding: 4px 6px; border-radius: 3px;
+            background: ${implemented ? 'rgba(255,255,255,0.03)' : 'transparent'};
+        `;
+
+        const lbl = document.createElement('span');
+        lbl.textContent = label;
+        lbl.style.cssText = `
+            font-size: 11px;
+            color: ${implemented ? '#ccc' : '#444'};
+            flex: 1; padding-right: 8px;
+        `;
+
+        const btn = document.createElement('button');
+
+        if (!implemented) {
+            btn.textContent = 'SOON';
+            btn.disabled = true;
+            btn.style.cssText = `
+                padding: 2px 10px; background: #111; color: #333;
+                border: 1px solid #2a2a2a; font-family: monospace; font-size: 10px;
+                border-radius: 3px; cursor: default; min-width: 54px;
+            `;
+        } else {
+            const isOn = !!FF[key];
+            btn.textContent = isOn ? 'ON' : 'OFF';
+            btn.style.cssText = this._toggleBtnCss(isOn);
+
+            btn.onclick = () => {
+                FF[key] = !FF[key];
+                const nowOn = FF[key];
+                btn.textContent = nowOn ? 'ON' : 'OFF';
+                btn.style.cssText = this._toggleBtnCss(nowOn);
+                row.style.background = nowOn
+                    ? 'rgba(68,255,136,0.07)'
+                    : 'rgba(255,255,255,0.03)';
+            };
+        }
+
+        row.appendChild(lbl);
+        row.appendChild(btn);
+        return row;
+    }
+
+    _toggleBtnCss(isOn) {
+        return `
+            padding: 2px 10px; min-width: 54px; text-align: center;
+            background: ${isOn ? '#1a3322' : '#1a1a1a'};
+            color: ${isOn ? '#44ff88' : '#666'};
+            border: 1px solid ${isOn ? '#44ff88' : '#444'};
+            font-family: monospace; font-size: 11px; font-weight: bold;
+            border-radius: 3px; cursor: pointer;
+        `;
     }
 
     // ── Readback ───────────────────────────────────────────────────────────

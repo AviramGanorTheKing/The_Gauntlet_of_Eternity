@@ -1,6 +1,7 @@
 import { GameConfig } from '../config/GameConfig.js';
 import { ClassData } from '../config/ClassData.js';
 import { ENTITY_STATES } from '../utils/Constants.js';
+import { FeatureFlags } from '../config/FeatureFlags.js';
 import { EventBus, Events } from '../utils/EventBus.js';
 import { normalize, angleBetween, angleToDirection, distance } from '../utils/MathUtils.js';
 /**
@@ -260,6 +261,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         this.activeWeaponIndex = index;
         this.weaponSwapCooldown = GameConfig.WEAPON_SWAP_COOLDOWN;
         this._recalcWeaponStats();
+
+        // [FEATURE: WEAPON_SWAP_SFX] Play equip sound on weapon swap
+        if (FeatureFlags.WEAPON_SWAP_SFX) {
+            this.scene.audioManager?.playSFX('sfx_equip');
+        }
 
         EventBus.emit(Events.WEAPON_SWAPPED, {
             player: this,

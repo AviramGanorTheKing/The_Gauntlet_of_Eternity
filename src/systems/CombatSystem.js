@@ -1,6 +1,7 @@
 import { GameConfig } from '../config/GameConfig.js';
 import { EventBus, Events } from '../utils/EventBus.js';
 import { normalize, distance } from '../utils/MathUtils.js';
+import { FeatureFlags } from '../config/FeatureFlags.js';
 
 /**
  * CombatSystem — handles attack hitboxes, damage calculation,
@@ -388,6 +389,11 @@ export class CombatSystem {
         this.applyKnockback(target, angle, knockbackMultiplier);
         this.showDamageNumber(target.x, target.y, finalDamage);
 
+        // [FEATURE: SCREEN_SHAKE] Light shake on every enemy hit
+        if (FeatureFlags.SCREEN_SHAKE) {
+            this.scene.cameras.main.shake(80, 0.002);
+        }
+
         EventBus.emit(Events.ENTITY_DAMAGED, { source, target, damage: finalDamage });
     }
 
@@ -416,6 +422,16 @@ export class CombatSystem {
             if (player.alive) player.clearTint();
         });
 
+        // [FEATURE: SCREEN_SHAKE] Stronger shake when the player takes a hit
+        if (FeatureFlags.SCREEN_SHAKE) {
+            this.scene.cameras.main.shake(150, 0.005);
+        }
+
+        // [FEATURE: DAMAGE_VIGNETTE] Red border flash on player hit
+        if (FeatureFlags.DAMAGE_VIGNETTE) {
+            this._showDamageVignette();
+        }
+
         this.applyKnockback(player, angle, 0.5);
         this.showDamageNumber(player.x, player.y, finalDamage, 0xff4444);
 
@@ -430,6 +446,35 @@ export class CombatSystem {
     }
 
     // ─── Visual Effects ──────────────────────────────────────────────────────
+
+    /**
+     * [FEATURE: DAMAGE_VIGNETTE]
+     * Flash a red border around the screen edges when the player is hit.
+     * Four thin rects at depth 999 (above everything), fade out over 250ms.
+     */
+    _showDamageVignette() {
+        const cam = this.scene.cameras.main;
+        const W = cam.width;
+        const H = cam.height;
+        const thickness = 28;
+
+        const gfx = this.scene.add.graphics();
+        gfx.setScrollFactor(0);       // fixed to camera, not world
+        gfx.setDepth(999);
+        gfx.fillStyle(0xff0000, 0.45);
+        gfx.fillRect(0, 0, W, thickness);           // top
+        gfx.fillRect(0, H - thickness, W, thickness); // bottom
+        gfx.fillRect(0, 0, thickness, H);           // left
+        gfx.fillRect(W - thickness, 0, thickness, H); // right
+
+        this.scene.tweens.add({
+            targets: gfx,
+            alpha: 0,
+            duration: 250,
+            ease: 'Power2',
+            onComplete: () => gfx.destroy(),
+        });
+    }
 
     /**
      * Apply white flash effect to a target.

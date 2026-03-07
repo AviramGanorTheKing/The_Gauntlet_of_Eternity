@@ -5,6 +5,7 @@
 import { ClassData } from '../config/ClassData.js';
 import { EnemyData } from '../config/EnemyData.js';
 import { GameConfig } from '../config/GameConfig.js';
+import { getDifficultyConfig } from '../config/DifficultyConfig.js';
 import { EventBus, Events } from '../utils/EventBus.js';
 
 export function initDebugBridge(game) {
@@ -214,6 +215,26 @@ export function initDebugBridge(game) {
             } catch (err) {
                 console.error('[DebugBridge] giveGold failed:', err);
             }
+        },
+
+        /** Spawn multiplier — scales maxActiveEnemies on all spawners. Seeded from difficulty. */
+        spawnMultiplier: getDifficultyConfig().spawnMultiplier || 1,
+
+        /** Get all live spawners. */
+        getSpawners() {
+            return this.getScene()?.spawners?.getChildren() || [];
+        },
+
+        /** Apply current spawnMultiplier to all live spawners + global cap. */
+        pushSpawnMultiplier(mult) {
+            this.spawnMultiplier = mult;
+            this._spawnMultOverride = true;
+            GameConfig.MAX_ENEMIES_PER_ROOM = Math.round(GameConfig.BASE_MAX_ENEMIES_PER_ROOM * mult);
+            for (const spawner of this.getSpawners()) {
+                if (!spawner.alive) continue;
+                spawner.maxActiveEnemies = Math.round(spawner._baseMaxActive * mult);
+            }
+            console.log(`[DebugBridge] Spawn multiplier: ${mult}x, global cap: ${GameConfig.MAX_ENEMIES_PER_ROOM}`);
         },
 
         /**

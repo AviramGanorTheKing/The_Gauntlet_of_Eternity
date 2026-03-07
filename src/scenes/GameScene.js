@@ -149,6 +149,14 @@ export class GameScene extends Phaser.Scene {
         // Maintain enemy counter (avoids filter() every spawn tick)
         this.activeEnemyCount = 0;
 
+        // Apply spawn multiplier from difficulty config (debug panel can override)
+        const diffSpawnMult = getDifficultyConfig().spawnMultiplier || 1;
+        if (window.GAUNTLET_DEBUG && !window.GAUNTLET_DEBUG._spawnMultOverride) {
+            window.GAUNTLET_DEBUG.spawnMultiplier = diffSpawnMult;
+        }
+        const spawnMult = window.GAUNTLET_DEBUG?.spawnMultiplier || diffSpawnMult;
+        GameConfig.MAX_ENEMIES_PER_ROOM = Math.round(GameConfig.BASE_MAX_ENEMIES_PER_ROOM * spawnMult);
+
         // ── Build first floor ────────────────────────────────────────────
         this.buildFloor(this.currentFloor);
 
@@ -180,6 +188,7 @@ export class GameScene extends Phaser.Scene {
         EventBus.on(Events.ENEMY_SPAWNED, this.onEnemySpawned, this);
         EventBus.on(Events.BOSS_DEFEATED, this.onBossDefeated, this);
         EventBus.on(Events.PLAYER_ATTACK, this.onPlayerAttackSpawners, this);
+        EventBus.on(Events.WEAPON_LEVELED_UP, this._onWeaponLeveledUp, this);
 
         // ESC to pause
         this.input.keyboard.on('keydown-ESC', () => this._openPauseMenu());
@@ -317,7 +326,8 @@ export class GameScene extends Phaser.Scene {
         for (const sp of floorData.spawnerPositions) {
             const spawner = new Spawner(this, sp.worldX, sp.worldY, sp.enemyType);
             spawner.spawnInterval = Math.round(spawner.spawnInterval * _spawnDiff.spawnIntervalMult);
-            spawner.maxActiveEnemies = _spawnDiff.maxEnemies;
+            spawner._baseMaxActive = _spawnDiff.maxEnemies;
+            spawner.maxActiveEnemies = Math.round(_spawnDiff.maxEnemies * (window.GAUNTLET_DEBUG?.spawnMultiplier || 1));
             this.spawners.add(spawner);
         }
 
@@ -1173,6 +1183,24 @@ export class GameScene extends Phaser.Scene {
 
     onEnemySpawned() { /* counter incremented in spawnEnemyFromSpawner */ }
 
+    /** Scale spawner pressure based on player's projectile count. */
+    _onWeaponLeveledUp() {
+        const style = this.player?.getActiveAttackStyle?.();
+        const shots = style?.multiShot || 1;
+        const BASE_INTERVAL = 2000;
+        const BASE_MAX = 6;
+        const newInterval = Math.max(1000, BASE_INTERVAL - (shots - 1) * 200);
+        const newMax = BASE_MAX + (shots - 1) * 2;
+        const mult = window.GAUNTLET_DEBUG?.spawnMultiplier || 1;
+
+        for (const spawner of this.spawners.getChildren()) {
+            if (!spawner.alive) continue;
+            spawner.spawnInterval = newInterval;
+            spawner._baseMaxActive = newMax;
+            spawner.maxActiveEnemies = Math.round(newMax * mult);
+        }
+    }
+
     onPlayerDeath(data) {
         // Phase 5: Calculate death bonus and finalize shards
         const deathBonus = this.progression?.calculateDeathBonus(this.currentFloor) || 0;
@@ -1491,6 +1519,8 @@ export class GameScene extends Phaser.Scene {
                 killCount: this.player?.killCount || 0,
                 damageDealt: this.player?.damageDealt || 0,
                 gear: this.player?.gear || {},
+                weapons: this.player?.weapons || [],
+                activeWeaponIndex: this.player?.activeWeaponIndex || 0,
             },
             floor: this.currentFloor,
             biome: this.dungeonManager?.getBiome()?.key || 'crypt',
@@ -1559,6 +1589,7 @@ export class GameScene extends Phaser.Scene {
         EventBus.off(Events.PLAYER_DEATH, this.onPlayerDeath, this);
         EventBus.off(Events.PLAYER_ATTACK, this.onPlayerAttackSpawners, this);
         EventBus.off(Events.BOSS_DEFEATED, this.onBossDefeated, this);
+        EventBus.off(Events.WEAPON_LEVELED_UP, this._onWeaponLeveledUp, this);
 
         if (this._hpBarGfx) this._hpBarGfx.destroy();
         this.combatSystem?.destroy();

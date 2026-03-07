@@ -266,6 +266,12 @@ export class BootScene extends Phaser.Scene {
         this.generateProjectile('projectile', 12, 0xffff00);
         this.generateProjectile('enemy_projectile', 12, 0xff44ff);
 
+        // Throwing axe projectile (warrior)
+        this.generateThrowingAxeProjectile('projectile_throwing_axe', 18);
+
+        // Arrow projectile (archer)
+        this.generateArrowProjectile('projectile_arrow', 18);
+
         // Spawner (portal-like)
         this.generateSpawnerSprite('spawner', 16);
 
@@ -2534,6 +2540,77 @@ export class BootScene extends Phaser.Scene {
         gfx.lineStyle(2, 0xffffff, 0.6);
         gfx.arc(size / 2, size / 2, size / 2 - 2, -Math.PI / 3, Math.PI / 3, false);
         gfx.strokePath();
+
+        gfx.generateTexture(key, size, size);
+        gfx.destroy();
+    }
+
+    generateThrowingAxeProjectile(key, size) {
+        const gfx = this.make.graphics({ add: false });
+        const cx = size / 2;
+        const cy = size / 2;
+
+        // Handle (vertical bar)
+        gfx.fillStyle(0x8B5E3C, 1);
+        gfx.fillRect(cx - 1, cy - size * 0.4, 2, size * 0.8);
+
+        // Blade (triangle on top-right)
+        gfx.fillStyle(0xcccccc, 1);
+        gfx.fillTriangle(
+            cx + 1, cy - size * 0.35,
+            cx + size * 0.4, cy - size * 0.15,
+            cx + 1, cy + size * 0.05
+        );
+
+        // Blade edge highlight
+        gfx.fillStyle(0xffffff, 0.6);
+        gfx.fillTriangle(
+            cx + 1, cy - size * 0.3,
+            cx + size * 0.25, cy - size * 0.18,
+            cx + 1, cy - size * 0.05
+        );
+
+        gfx.generateTexture(key, size, size);
+        gfx.destroy();
+    }
+
+    generateArrowProjectile(key, size) {
+        const gfx = this.make.graphics({ add: false });
+        const cx = size / 2;
+        const cy = size / 2;
+
+        // Shaft (horizontal line, arrow points right)
+        gfx.fillStyle(0x8B5E3C, 1);
+        gfx.fillRect(cx - size * 0.4, cy - 1, size * 0.6, 2);
+
+        // Arrowhead (triangle pointing right)
+        gfx.fillStyle(0xcccccc, 1);
+        gfx.fillTriangle(
+            cx + size * 0.4, cy,
+            cx + size * 0.1, cy - size * 0.2,
+            cx + size * 0.1, cy + size * 0.2
+        );
+
+        // Arrowhead edge highlight
+        gfx.fillStyle(0xffffff, 0.5);
+        gfx.fillTriangle(
+            cx + size * 0.35, cy,
+            cx + size * 0.15, cy - size * 0.12,
+            cx + size * 0.15, cy + size * 0.02
+        );
+
+        // Fletching (small feathers at tail)
+        gfx.fillStyle(0xcc4444, 0.8);
+        gfx.fillTriangle(
+            cx - size * 0.4, cy,
+            cx - size * 0.25, cy - size * 0.15,
+            cx - size * 0.25, cy
+        );
+        gfx.fillTriangle(
+            cx - size * 0.4, cy,
+            cx - size * 0.25, cy + size * 0.15,
+            cx - size * 0.25, cy
+        );
 
         gfx.generateTexture(key, size, size);
         gfx.destroy();

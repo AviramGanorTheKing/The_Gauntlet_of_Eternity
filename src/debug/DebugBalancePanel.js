@@ -386,6 +386,33 @@ export class DebugBalancePanel {
         goldRow.appendChild(goldInput);
         goldRow.appendChild(goldBtn);
         this.content.appendChild(goldRow);
+
+        // ── Spawn Multiplier ─────────────────────────────────────────────
+        this.content.appendChild(document.createElement('hr'));
+
+        const spawnTitle = document.createElement('div');
+        spawnTitle.textContent = '👾 SPAWN MULTIPLIER';
+        spawnTitle.style.cssText = 'color: #ff44ff; font-size: 13px; font-weight: bold; margin: 10px 0; border-bottom: 1px solid #333; padding-bottom: 4px;';
+        this.content.appendChild(spawnTitle);
+
+        const spawnRow = this._sliderRow({
+            key: 'spawnMult', label: 'Max Enemies Multiplier',
+            min: 0.5, max: 5, step: 0.5, value: db.spawnMultiplier || 1
+        });
+        this.content.appendChild(spawnRow.container);
+
+        const spawnBtn = this._pushButton('👾 Apply Multiplier', () => {
+            const val = parseFloat(spawnRow.input.value) || 1;
+            db.pushSpawnMultiplier(val);
+            this._flashButton(spawnBtn);
+            this._updateReadback();
+        });
+        spawnBtn.style.background = '#2a1a2a';
+        spawnBtn.style.color = '#ff44ff';
+        spawnBtn.style.borderColor = '#ff44ff';
+        spawnBtn.onmouseenter = () => { spawnBtn.style.background = '#3a2a3a'; };
+        spawnBtn.onmouseleave = () => { spawnBtn.style.background = '#2a1a2a'; };
+        this.content.appendChild(spawnBtn);
     }
 
     // ── Features Tab ───────────────────────────────────────────────────────
@@ -580,6 +607,12 @@ export class DebugBalancePanel {
             html += '<span style="color:#666">No active player</span><br>';
         }
         html += `Enemies alive: ${enemies.filter(e => e.alive).length}`;
+        const spawners = db.getSpawners?.() || [];
+        const aliveSpawners = spawners.filter(s => s.alive);
+        if (aliveSpawners.length) {
+            const maxPer = aliveSpawners[0]?.maxActiveEnemies || '?';
+            html += ` | Spawners: ${aliveSpawners.length} (max ${maxPer}/ea, ${db.spawnMultiplier || 1}x)`;
+        }
 
         this.readback.innerHTML = html;
     }

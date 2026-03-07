@@ -39,6 +39,7 @@ export const GameConfig = {
 
     // Enemy spawning
     MAX_ENEMIES_PER_ROOM: 50,
+    BASE_MAX_ENEMIES_PER_ROOM: 50,
     SWARMER_SPAWN_INTERVAL: 3000, // ms
 
     // ── Phase 3 additions ────────────────────────────────────────────────

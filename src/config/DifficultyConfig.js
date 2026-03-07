@@ -21,6 +21,7 @@ export const DIFFICULTIES = {
         playerHp:          1.30,
         healing:           1.30,
         shards:            0.75,
+        spawnMultiplier:   1,
     },
     normal: {
         label: 'NORMAL',
@@ -32,6 +33,7 @@ export const DIFFICULTIES = {
         playerHp:          1.00,
         healing:           1.00,
         shards:            1.00,
+        spawnMultiplier:   3,
     },
     hard: {
         label: 'HARD',
@@ -43,6 +45,7 @@ export const DIFFICULTIES = {
         playerHp:          0.80,
         healing:           0.70,
         shards:            1.50,
+        spawnMultiplier:   5,
     },
 };
 

@@ -27,9 +27,11 @@ export class Spawner extends Phaser.Physics.Arcade.Sprite {
         this.alive = true;
 
         // Spawn timing
-        this.spawnInterval = 4000; // ms between spawns
-        this.spawnTimer = Phaser.Math.Between(1000, 3000); // stagger initial spawn
-        this.maxActiveEnemies = 4; // max from this spawner at once
+        this.spawnInterval = 2000; // ms between spawns
+        this.spawnTimer = Phaser.Math.Between(500, 1500); // stagger initial spawn
+        this._baseMaxActive = 6; // base value before multiplier
+        const mult = window.GAUNTLET_DEBUG?.spawnMultiplier || 1;
+        this.maxActiveEnemies = Math.round(this._baseMaxActive * mult);
         this.spawnedEnemies = [];
 
         // Spawn offset (spawn enemies slightly away from the 32x32 spawner)

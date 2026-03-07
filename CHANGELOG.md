@@ -10,6 +10,55 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.9.0] - 2026-03-07
+
+### Added
+- **Throwing Axe (Warrior)**: Replaced melee axe with a ranged projectile weapon
+  - Projectile type, range 220, speed 260, knockback 0.8
+  - Perks: Ricochet (pierce) at Lv.2, Heavy Axe (+knockback) at Lv.4
+  - Custom spinning axe texture generated at boot
+- **Custom Projectile Textures**: Arrow and throwing axe projectiles now have unique visuals
+  - Arrow: brown shaft, grey arrowhead, red fletching — used by all archer weapons
+  - Throwing Axe: brown handle + grey blade with spin animation
+  - Falls back to class-based texture when no weapon equipped (archer always gets arrows)
+- **MultiShot Scaling per Weapon Level**: Projectile weapons gain +1 projectile per level
+  - Level 1→5 fires 1→5 projectiles in a fan spread
+  - Applies to: Throwing Axe, Shortbow, Longbow, Crossbow
+  - Replaced redundant multiShot perks with new perks (Piercing Arrow, Heavy Axe)
+- **Spawn Multiplier System**: Configurable enemy density scaling
+  - Per-difficulty defaults: Easy 1x, Normal 3x, Hard 5x
+  - Scales both per-spawner max enemies AND global `MAX_ENEMIES_PER_ROOM` cap
+  - Live adjustable via debug panel (G key → DEV tab → Spawn Multiplier slider, 0.5x–5x)
+  - Debug override persists across floor transitions
+- **Spawner Pressure Scaling**: Enemy spawns scale with player projectile count
+  - Each weapon level reduces spawn interval (-200ms) and increases spawner max (+2)
+  - Interacts with spawn multiplier for combined scaling
+
+### Changed
+- **Enemy Stats Rebalanced**: Reduced HP and damage across all enemy types for faster combat
+  - Swarmer: 15→8 HP, 8→5 damage
+  - Bruiser: 80→40 HP, 18→12 damage
+  - Ranged: 25→12 HP, 12→8 damage
+  - Bomber: 10→5 HP, 30→20 damage
+- **Faster Spawn Rate**: Base spawn interval halved (4000ms→2000ms), max per spawner 4→6
+- Difficulty `spawnMultiplier` field added to all three tiers in `DifficultyConfig.js`
+- Pierce perk descriptions corrected from "Pierces 1 target" to "Pierces enemies"
+- Scythe `levelBonuses.attack` removed (was dead code — cone weapons use `attackStyle.damage`)
+
+### Fixed
+- **Pause menu weapons not showing**: `weapons` and `activeWeaponIndex` were not passed to PauseScene — inventory now displays both weapon slots correctly
+- **Throwing axe used default circle texture**: `getActiveWeapon()` didn't exist on Player — fixed to read `player.weapons[activeWeaponIndex]`
+- **Spawn multiplier ignored global cap**: `MAX_ENEMIES_PER_ROOM` was hardcoded at 50 — now scales with multiplier via `BASE_MAX_ENEMIES_PER_ROOM`
+- **Debug spawn override lost on floor transition**: Difficulty config unconditionally re-seeded the multiplier — now respects `_spawnMultOverride` flag
+- **Spawner `_baseMaxActive` not set by difficulty**: Floor build overwrote `maxActiveEnemies` without updating `_baseMaxActive`, breaking debug multiplier math
+
+### Performance
+- `ARROW_WEAPONS` array hoisted to module-level const (was allocated per `firePlayerProjectile` call)
+- Throwing axe spin rotation now delta-scaled (was frame-rate dependent)
+- `multiShot` loop count guarded with `Math.floor` to prevent fractional iterations
+
+---
+
 ## [0.8.0] - 2026-03-07
 
 ### Added
@@ -235,6 +284,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 0.9.0 | 2026-03-07 | Throwing axe, arrow textures, multiShot scaling, spawn multiplier, enemy rebalance |
 | 0.8.0 | 2026-03-07 | Difficulty system (Easy/Normal/Hard), 60 FPS perf fixes with companions |
 | 0.7.0 | 2026-03-06 | FeatureFlags system, 17 experimental features, dual weapons, weapon XP & perks |
 | 0.6.2 | 2026-03-03 | Music system, loading screen improvements, boss spawn fixes |

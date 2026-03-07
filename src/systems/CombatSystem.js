@@ -3,6 +3,8 @@ import { EventBus, Events } from '../utils/EventBus.js';
 import { normalize, distance } from '../utils/MathUtils.js';
 import { FeatureFlags } from '../config/FeatureFlags.js';
 
+const ARROW_WEAPONS = ['shortbow', 'longbow', 'crossbow'];
+
 /**
  * CombatSystem — handles attack hitboxes, damage calculation,
  * knockback, white flash, and floating damage numbers.
@@ -83,7 +85,7 @@ export class CombatSystem {
         } else if (attackData.type === 'cone') {
             this.resolveConeHit(player, angle, attackData, attackPower);
         } else if (attackData.type === 'projectile') {
-            const shotCount = attackData.multiShot || 1;
+            const shotCount = Math.floor(attackData.multiShot || 1);
             if (shotCount <= 1) {
                 this.firePlayerProjectile(player, angle, attackData, attackPower);
             } else {
@@ -110,12 +112,26 @@ export class CombatSystem {
         const homing = attackData.homing || false;
         const homingTurnRate = 0.04; // radians per frame
 
-        // Use existing 'projectile' texture as a sprite
-        const proj = this.scene.add.sprite(player.x, player.y, 'projectile');
+        // Pick texture based on weapon type (fall back to class for unequipped)
+        const weaponId = player.weapons?.[player.activeWeaponIndex]?.id;
+        const classKey = player.classKey;
+        const isThrowingAxe = weaponId === 'throwing_axe';
+        const isArrow = ARROW_WEAPONS.includes(weaponId) || (!weaponId && classKey === 'archer');
+
+        let textureKey = 'projectile';
+        if (isThrowingAxe && this.scene.textures.exists('projectile_throwing_axe')) {
+            textureKey = 'projectile_throwing_axe';
+        } else if (isArrow && this.scene.textures.exists('projectile_arrow')) {
+            textureKey = 'projectile_arrow';
+        }
+
+        const proj = this.scene.add.sprite(player.x, player.y, textureKey);
         proj.setDepth(8);
-        proj.setScale(1.2);
-        proj.setTint(player.classData.color);
+        const useCustomTexture = isThrowingAxe || isArrow;
+        proj.setScale(useCustomTexture ? 1.4 : 1.2);
+        if (!useCustomTexture) proj.setTint(player.classData.color);
         proj.setRotation(angle);
+        proj._isSpinning = isThrowingAxe;
 
         // Particle trail for visibility
         let trailEmitter = null;
@@ -182,6 +198,11 @@ export class CombatSystem {
             const vy = Math.sin(currentAngle) * speed;
             proj.x += vx * (delta / 1000);
             proj.y += vy * (delta / 1000);
+
+            // Spinning projectile (throwing axe) — delta-scaled
+            if (proj._isSpinning) {
+                proj.rotation += 12 * (delta / 1000);
+            }
 
             // Range check
             const dx = proj.x - startX;

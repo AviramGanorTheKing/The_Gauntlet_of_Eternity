@@ -57,14 +57,14 @@ export const WEAPON_TABLES = {
             levelBonuses: { attack: 2, knockback: 0.05 },
         },
         {
-            id: 'axe', name: 'Axe', attack: 24,
-            attackStyle: { type: 'melee', range: 44, arc: 60, knockback: 1.2 },
+            id: 'throwing_axe', name: 'Throwing Axe', attack: 22,
+            attackStyle: { type: 'projectile', range: 220, speed: 260, pierces: false, knockback: 0.8, multiShot: 1 },
             maxLevel: DEFAULT_MAX_LEVEL, xpCurve: DEFAULT_XP_CURVE,
             perks: [
-                { level: 2, id: 'axe_rend', name: 'Rend', desc: 'Burns on hit', effect: { onHit: 'burn' } },
-                { level: 4, id: 'axe_execute', name: 'Execute', desc: '+30% crit below 30% HP', effect: { executeCrit: 0.30, executeThreshold: 0.30 } },
+                { level: 2, id: 'taxe_ricochet', name: 'Ricochet', desc: 'Pierces enemies', effect: { pierces: true } },
+                { level: 4, id: 'taxe_heavy', name: 'Heavy Axe', desc: '+0.4 knockback', effect: { knockback: 0.4 } },
             ],
-            levelBonuses: { attack: 3 },
+            levelBonuses: { attack: 3, speed: 10, multiShot: 1 },
         },
         {
             id: 'mace', name: 'Mace', attack: 20,
@@ -104,7 +104,7 @@ export const WEAPON_TABLES = {
             maxLevel: DEFAULT_MAX_LEVEL, xpCurve: DEFAULT_XP_CURVE,
             perks: [
                 { level: 2, id: 'orb_speed', name: 'Swift Orb', desc: '+40 speed', effect: { speed: 40 } },
-                { level: 4, id: 'orb_chain', name: 'Chain Hit', desc: 'Pierces 1 target', effect: { pierces: true } },
+                { level: 4, id: 'orb_chain', name: 'Chain Hit', desc: 'Pierces enemies', effect: { pierces: true } },
             ],
             levelBonuses: { attack: 2, speed: 10 },
         },
@@ -112,33 +112,33 @@ export const WEAPON_TABLES = {
     archer: [
         {
             id: 'shortbow', name: 'Shortbow', attack: 14,
-            attackStyle: { type: 'projectile', range: 280, speed: 350, pierces: false, knockback: 0.3 },
+            attackStyle: { type: 'projectile', range: 280, speed: 350, pierces: false, knockback: 0.3, multiShot: 1 },
             maxLevel: DEFAULT_MAX_LEVEL, xpCurve: DEFAULT_XP_CURVE,
             perks: [
                 { level: 2, id: 'shortbow_rapid', name: 'Rapid Fire', desc: '+15% attack speed', effect: { attackSpeedMult: 1.15 } },
-                { level: 4, id: 'shortbow_double', name: 'Double Shot', desc: '2 arrows', effect: { multiShot: 2 } },
+                { level: 4, id: 'shortbow_pierce', name: 'Piercing Arrow', desc: 'Arrows pierce', effect: { pierces: true } },
             ],
-            levelBonuses: { attack: 2, speed: 15 },
+            levelBonuses: { attack: 2, speed: 15, multiShot: 1 },
         },
         {
             id: 'longbow', name: 'Longbow', attack: 20,
-            attackStyle: { type: 'projectile', range: 340, speed: 320, pierces: true, knockback: 0.4 },
+            attackStyle: { type: 'projectile', range: 340, speed: 320, pierces: true, knockback: 0.4, multiShot: 1 },
             maxLevel: DEFAULT_MAX_LEVEL, xpCurve: DEFAULT_XP_CURVE,
             perks: [
                 { level: 2, id: 'longbow_range', name: 'Sniper', desc: '+50 range', effect: { range: 50 } },
                 { level: 4, id: 'longbow_crit', name: 'Headshot', desc: '+15% crit', effect: { critChance: 0.15 } },
             ],
-            levelBonuses: { attack: 3 },
+            levelBonuses: { attack: 3, multiShot: 1 },
         },
         {
             id: 'crossbow', name: 'Crossbow', attack: 28,
-            attackStyle: { type: 'projectile', range: 260, speed: 280, pierces: false, knockback: 0.6 },
+            attackStyle: { type: 'projectile', range: 260, speed: 280, pierces: false, knockback: 0.6, multiShot: 1 },
             maxLevel: DEFAULT_MAX_LEVEL, xpCurve: DEFAULT_XP_CURVE,
             perks: [
                 { level: 2, id: 'crossbow_heavy', name: 'Heavy Bolt', desc: '+0.3 knockback', effect: { knockback: 0.3 } },
                 { level: 4, id: 'crossbow_stun', name: 'Stun Bolt', desc: '15% stun', effect: { stunChance: 0.15 } },
             ],
-            levelBonuses: { attack: 4 },
+            levelBonuses: { attack: 4, multiShot: 1 },
         },
     ],
     valkyrie: [
@@ -175,6 +175,8 @@ export const WEAPON_TABLES = {
     ],
     necromancer: [
         {
+            // NOTE: Cone weapons use attackStyle.damage (not top-level attack) for damage calc.
+            // levelBonuses.damage scales the cone damage; top-level attack is unused for cones.
             id: 'scythe', name: 'Scythe', attack: 14,
             attackStyle: { type: 'cone', range: 100, arc: 60, knockback: 0.4, damage: 14 },
             maxLevel: DEFAULT_MAX_LEVEL, xpCurve: DEFAULT_XP_CURVE,
@@ -182,7 +184,7 @@ export const WEAPON_TABLES = {
                 { level: 2, id: 'scythe_reap', name: 'Reap', desc: '+15 arc', effect: { arc: 15 } },
                 { level: 4, id: 'scythe_siphon', name: 'Soul Siphon', desc: '5% lifesteal', effect: { onHit: 'lifesteal', value: 0.05 } },
             ],
-            levelBonuses: { attack: 2, damage: 2 },
+            levelBonuses: { damage: 2 },
         },
         {
             id: 'cursed_tome', name: 'Cursed Tome', attack: 12,
@@ -200,7 +202,7 @@ export const WEAPON_TABLES = {
             maxLevel: DEFAULT_MAX_LEVEL, xpCurve: DEFAULT_XP_CURVE,
             perks: [
                 { level: 2, id: 'wand_lifetap', name: 'Life Tap', desc: '+3 mana on kill', effect: { onKill: 'mana', value: 3 } },
-                { level: 4, id: 'wand_seeker', name: 'Bone Seeker', desc: 'Pierces 1 target', effect: { pierces: true } },
+                { level: 4, id: 'wand_seeker', name: 'Bone Seeker', desc: 'Pierces enemies', effect: { pierces: true } },
             ],
             levelBonuses: { attack: 1, speed: 10 },
         },

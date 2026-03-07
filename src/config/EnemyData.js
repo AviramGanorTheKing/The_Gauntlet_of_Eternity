@@ -5,9 +5,9 @@
 export const EnemyData = {
     swarmer: {
         name: 'Swarmer',
-        hp: 15,
+        hp: 8,
         speed: 100,
-        damage: 8,
+        damage: 5,
         defense: 0,
         attackCooldown: 800, // ms between contact damage ticks
         aggroRange: 300, // pixels
@@ -19,9 +19,9 @@ export const EnemyData = {
 
     bruiser: {
         name: 'Bruiser',
-        hp: 80,
+        hp: 40,
         speed: 50,
-        damage: 18,
+        damage: 12,
         defense: 4,
         attackCooldown: 1500,
         aggroRange: 200,
@@ -35,9 +35,9 @@ export const EnemyData = {
 
     ranged: {
         name: 'Ranged',
-        hp: 25,
+        hp: 12,
         speed: 70,
-        damage: 12,
+        damage: 8,
         defense: 1,
         attackCooldown: 2000,
         aggroRange: 250,
@@ -51,9 +51,9 @@ export const EnemyData = {
 
     bomber: {
         name: 'Bomber',
-        hp: 10,
+        hp: 5,
         speed: 130,
-        damage: 30,
+        damage: 20,
         defense: 0,
         explosionRadius: 48,
         fuseTime: 500, // ms after reaching target

@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>The Gauntlet of Eternity</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -14,6 +17,12 @@
 <body>
     <div id="game-container"></div>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-    <script type="module" src="src/main.js"></script>
+    <script>
+        // Cache-bust: register a service worker that forces network-first for all JS modules
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+    </script>
+    <script type="module" src="src/main.js?v=0.9.0"></script>
 </body>
 </html>

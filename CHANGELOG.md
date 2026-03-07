@@ -10,6 +10,28 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.8.0] - 2026-03-07
+
+### Added
+- **Difficulty System**: Three global tiers selectable from the main menu Settings panel
+  - **Easy** — enemy HP/damage ×0.7, slower spawns (×1.4 interval, max 3 active), player HP ×1.3, potion healing ×1.3, soul shards ×0.75
+  - **Normal** — all multipliers at ×1.0 (default, matches prior behavior exactly)
+  - **Hard** — enemy HP/damage ×1.4, faster spawns (×0.7 interval, max 6 active), player HP ×0.8, potion healing ×0.7, soul shards ×1.5
+  - Persisted in `localStorage` key `gauntlet_difficulty`, survives session/profile changes
+  - `src/config/DifficultyConfig.js` — single source of truth for all multipliers
+  - Settings panel expanded to show three difficulty toggle buttons with color-coded labels and a shard multiplier hint
+
+### Performance
+- **60 FPS restored with 2 companions**: Multiple optimizations across companion AI, rendering, and UI
+  - Companion AI: throttle enemy scan to every 8 frames (~133ms), use squared distances, share cached enemy list
+  - Formation offsets moved to module-level const (was allocating 3 new objects every frame per companion)
+  - GameScene: cache `enemies.getChildren()` once per frame for all systems to reuse
+  - HP bars: viewport culling — skip entities outside camera bounds
+  - UIScene cooldown indicators: skip redraw when quantized state unchanged (2% step buckets)
+  - AnnouncerSystem: replace native `setTimeout` with `scene.time.delayedCall` (reduces GC pressure)
+
+---
+
 ## [0.7.0] - 2026-03-06
 
 ### Added
@@ -213,6 +235,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 0.8.0 | 2026-03-07 | Difficulty system (Easy/Normal/Hard), 60 FPS perf fixes with companions |
 | 0.7.0 | 2026-03-06 | FeatureFlags system, 17 experimental features, dual weapons, weapon XP & perks |
 | 0.6.2 | 2026-03-03 | Music system, loading screen improvements, boss spawn fixes |
 | 0.6.1 | 2026-03-02 | Alternative aim mode (movement-based shooting) |

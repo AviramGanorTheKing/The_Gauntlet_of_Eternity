@@ -1,5 +1,6 @@
 import { applyCRTShader } from '../shaders/CRTShader.js';
 import { PauseScene } from './PauseScene.js';
+import { DIFFICULTIES, getDifficulty, setDifficulty } from '../config/DifficultyConfig.js';
 
 /**
  * MenuScene — Title screen with CRT-styled visuals.
@@ -628,7 +629,7 @@ export class MenuScene extends Phaser.Scene {
 
         // Panel background
         const panelW = 450;
-        const panelH = 320;
+        const panelH = 390;
         const panelBg = this.add.graphics();
         panelBg.fillStyle(0x111122, 0.95);
         panelBg.fillRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 10);
@@ -742,6 +743,50 @@ export class MenuScene extends Phaser.Scene {
             updateKeybindInfo();
             PauseScene.saveSettings(settings);
         });
+
+        // ── Difficulty Selector ───────────────────────────────────────────
+        const diffY = aimModeY + 50;
+        const diffLabel = this.add.text(colX, diffY, 'Difficulty:', {
+            fontFamily: 'monospace', fontSize: '11px', color: '#cccccc',
+        });
+        this._settingsContainer.add(diffLabel);
+
+        let currentDiff = getDifficulty();
+        const diffBtnRefs = {};
+
+        const makeDiffBtn = (key, offsetX) => {
+            const cfg = DIFFICULTIES[key];
+            const isActive = () => currentDiff === key;
+            const btn = this.add.text(colX + offsetX, diffY + 18, `[${cfg.label}]`, {
+                fontFamily: 'monospace', fontSize: '10px',
+                color: isActive() ? cfg.color : '#555566',
+                stroke: '#000', strokeThickness: 1,
+            }).setInteractive();
+
+            const refresh = () => {
+                btn.setColor(currentDiff === key ? cfg.color : '#555566');
+            };
+
+            btn.on('pointerdown', () => {
+                currentDiff = key;
+                setDifficulty(key);
+                Object.values(diffBtnRefs).forEach(r => r());
+            });
+            btn.on('pointerover', () => { if (currentDiff !== key) btn.setColor('#888899'); });
+            btn.on('pointerout', () => refresh());
+
+            diffBtnRefs[key] = refresh;
+            this._settingsContainer.add(btn);
+        };
+
+        makeDiffBtn('easy',   0);
+        makeDiffBtn('normal', 80);
+        makeDiffBtn('hard',   175);
+
+        const diffHint = this.add.text(colX, diffY + 36, 'Easy: 0.75x shards  |  Hard: 1.5x shards', {
+            fontFamily: 'monospace', fontSize: '8px', color: '#444455',
+        });
+        this._settingsContainer.add(diffHint);
 
         // ── Close Button ──────────────────────────────────────────────────
         const closeBtn = this.add.text(0, panelH / 2 - 30, '[ CLOSE ]', {

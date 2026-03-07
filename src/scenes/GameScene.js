@@ -41,6 +41,7 @@ import { TutorialPromptSystem } from '../systems/TutorialPromptSystem.js';
 import { LoreData } from '../config/LoreData.js';
 import { PauseScene } from './PauseScene.js';
 import { FeatureFlags } from '../config/FeatureFlags.js';
+import { getDifficultyConfig } from '../config/DifficultyConfig.js';
 
 // Player class lookup by key
 const PLAYER_CLASSES = {
@@ -217,6 +218,12 @@ export class GameScene extends Phaser.Scene {
             inputSource.setAimMode(PauseScene.loadSettings().aimMode || 'mouse');
             this.player.setInputSource(inputSource);
 
+            // Apply difficulty multipliers to player
+            const _diffCfg = getDifficultyConfig();
+            this.player.maxHp = Math.ceil(this.player.maxHp * _diffCfg.playerHp);
+            this.player.hp = this.player.maxHp;
+            this.player.healingMult = _diffCfg.healing;
+
             this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
             this.cameras.main.setZoom(GameConfig.CAMERA_ZOOM);
 
@@ -306,8 +313,11 @@ export class GameScene extends Phaser.Scene {
         });
 
         // ── Spawners ─────────────────────────────────────────────────────
+        const _spawnDiff = getDifficultyConfig();
         for (const sp of floorData.spawnerPositions) {
             const spawner = new Spawner(this, sp.worldX, sp.worldY, sp.enemyType);
+            spawner.spawnInterval = Math.round(spawner.spawnInterval * _spawnDiff.spawnIntervalMult);
+            spawner.maxActiveEnemies = _spawnDiff.maxEnemies;
             this.spawners.add(spawner);
         }
 
@@ -792,6 +802,12 @@ export class GameScene extends Phaser.Scene {
 
         enemy.setTarget(this.player);
 
+        // Apply difficulty multipliers to enemy stats
+        const _eDiff = getDifficultyConfig();
+        enemy.hp     = Math.ceil(enemy.hp     * _eDiff.enemyHp);
+        enemy.maxHp  = Math.ceil(enemy.maxHp  * _eDiff.enemyHp);
+        enemy.damage = Math.ceil(enemy.damage * _eDiff.enemyDamage);
+
         // [FEATURE: FLOOR_DIFFICULTY_SCALE] Scale HP and damage per floor
         if (FeatureFlags.FLOOR_DIFFICULTY_SCALE && this.currentFloor > 1) {
             const hpMult  = 1 + (this.currentFloor - 1) * 0.12;
@@ -1160,7 +1176,7 @@ export class GameScene extends Phaser.Scene {
     onPlayerDeath(data) {
         // Phase 5: Calculate death bonus and finalize shards
         const deathBonus = this.progression?.calculateDeathBonus(this.currentFloor) || 0;
-        const shardsEarned = this.progression?.finalizeRunShards() || 0;
+        const shardsEarned = Math.round((this.progression?.finalizeRunShards() || 0) * getDifficultyConfig().shards);
         const shardBreakdown = this.progression?.getShardBreakdown() || {};
 
         // End run in save manager
@@ -1500,7 +1516,7 @@ export class GameScene extends Phaser.Scene {
      */
     _triggerVictory() {
         // Finalize run shards
-        const shardsEarned = this.progression?.finalizeRunShards() || 0;
+        const shardsEarned = Math.round((this.progression?.finalizeRunShards() || 0) * getDifficultyConfig().shards);
         const shardBreakdown = this.progression?.getShardBreakdown() || {};
 
         // Determine ending

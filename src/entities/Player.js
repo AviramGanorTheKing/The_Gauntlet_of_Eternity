@@ -393,7 +393,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         if (this.hpPotions <= 0) return;
         if (this.hp >= this.maxHp) return;
         this.hpPotions--;
-        const heal = Math.floor(this.maxHp * GameConfig.HEALTH_POTION_HEAL_PERCENT);
+        const heal = Math.floor(this.maxHp * GameConfig.HEALTH_POTION_HEAL_PERCENT * (this.healingMult || 1));
         this.hp = Math.min(this.maxHp, this.hp + heal);
 
         EventBus.emit(Events.POTION_USED, { player: this, type: 'health', heal });
